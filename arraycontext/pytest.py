@@ -34,6 +34,7 @@ THE SOFTWARE.
 from typing import Any, Callable, Dict, Sequence, Type, Union
 
 import pyopencl as cl
+import pycuda
 from arraycontext.context import ArrayContext
 
 
@@ -65,6 +66,22 @@ class PytestPyOpenCLArrayContextFactory:
         # the context survives.
         ctx = cl.Context([self.device])
         return ctx, cl.CommandQueue(ctx)
+
+    def __call__(self) -> ArrayContext:
+        raise NotImplementedError
+
+
+class PytestPyCUDAArrayContextFactory:
+    """
+    .. automethod:: __init__
+    .. automethod:: __call__
+    """
+
+    def __init__(self, allocator):
+        """
+        :arg allocator: a :class:`gpuarray.allocator`.
+        """
+        self.allocator = allocator
 
     def __call__(self) -> ArrayContext:
         raise NotImplementedError
@@ -124,6 +141,15 @@ class _PytestPytatoPyOpenCLArrayContextFactory(
                 (
                     self.device.name.strip(),
                     self.device.platform.name.strip()))
+
+
+class _PytestPyCUDAArrayContextFactory(
+        PytestPyCUDAArrayContextFactory):
+
+    def __call__(self):
+        from arraycontext import PyCUDAArrayContext
+        allocator  = None
+        return self.actx_class(allocator)
 
 
 _ARRAY_CONTEXT_FACTORY_REGISTRY: \

@@ -34,12 +34,14 @@ from arraycontext import (
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
+        PyCUDAArrayContext,
         ArrayContainer,)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
-                                 _PytestPytatoPyOpenCLArrayContextFactory)
+                                 _PytestPytatoPyOpenCLArrayContextFactory,
+                                 _PyCUDAArrayContextFactory)
 
 
 import logging
@@ -66,6 +68,15 @@ class _PytatoPyOpenCLArrayContextForTests(PytatoPyOpenCLArrayContext):
     def transform_loopy_program(self, t_unit):
         return t_unit
 
+class _PyCUDAArrayContextForTests(PyCUDAArrayContext):
+    """Like :class:`PyCUDAArrayContext`, but applies no program
+    transformations whatsoever. Only to be used for testing internal to
+    :mod:`arraycontext`.
+    """
+
+    def transform_loopy_program(self, t_unit):
+        return t_unit
+
 
 class _PyOpenCLArrayContextWithHostScalarsForTestsFactory(
         _PytestPyOpenCLArrayContextFactoryWithClass):
@@ -82,10 +93,16 @@ class _PytatoPyOpenCLArrayContextForTestsFactory(
     actx_class = _PytatoPyOpenCLArrayContextForTests
 
 
+class _PyCUDAArrayContextForTestsFactory(
+        _PyCUDAArrayContextFactory):
+    actx_class = _PyCUDAArrayContextForTests
+
+
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
     _PyOpenCLArrayContextForTestsFactory,
     _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
     _PytatoPyOpenCLArrayContextForTestsFactory,
+    _PyCUDAArrayContextForTestsFactory,
     ])
 
 
