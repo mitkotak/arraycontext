@@ -2,6 +2,7 @@
 .. currentmodule:: arraycontext
 
 .. autoclass:: PytestPyOpenCLArrayContextFactory
+.. autoclass:: PytestPyCUDAArrayContextFactory
 
 .. autofunction:: pytest_generate_tests_for_array_contexts
 .. autofunction:: pytest_generate_tests_for_pyopencl_array_context
@@ -146,10 +147,13 @@ class _PytestPytatoPyOpenCLArrayContextFactory(
 class _PytestPyCUDAArrayContextFactory(
         PytestPyCUDAArrayContextFactory):
 
-    def __call__(self):
+    @property
+    def actx_class(self):
         from arraycontext import PyCUDAArrayContext
-        allocator  = None
-        return self.actx_class(allocator)
+        return PyCUDAArrayContext
+
+    def __call__(self):
+        return self.actx_class(None)
 
 
 _ARRAY_CONTEXT_FACTORY_REGISTRY: \

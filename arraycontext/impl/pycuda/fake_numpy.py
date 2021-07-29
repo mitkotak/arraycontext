@@ -1,9 +1,9 @@
 """
 .. currentmodule:: arraycontext
-.. autoclass:: PyOpenCLArrayContext
+.. autoclass:: PyCUDAArrayContext
 """
 __copyright__ = """
-Copyright (C) 2020-1 University of Illinois Board of Trustees
+Copyright (C) 2021 University of Illinois Board of Trustees
 """
 
 __license__ = """
@@ -37,7 +37,7 @@ from arraycontext.container.traversal import (
         )
 
 try:
-    import pycuda.gpuarray as gpuarray  a
+    import pycuda.gpuarray as gpuarray
 except ImportError:
     pass
 
@@ -76,14 +76,6 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
         return rec_multimap_array_container(operator.le, x, y)
 
     # }}}
-
-    def ones_like(self, ary):
-        def _ones_like(subary):
-            ones = self._array_context.empty_like(subary)
-            ones.fill(1)
-            return ones
-
-        return self._new_like(ary, _ones_like)
 
     def maximum(self, x, y):
         return rec_multimap_array_container(gpuarray.maximum,x, y)
@@ -127,18 +119,7 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
         )
 
     def ravel(self, a, order="C"):
-        def _rec_ravel(a):
-            if order in "FCA":
-                return a.reshape(-1, order=order)
-
-            elif order == "K":
-                raise NotImplementedError("PyCUDAArrayContext.np.ravel not "
-                                          "implemented for 'order=K'")
-            else:
-                raise ValueError("`order` can be one of 'F', 'C', 'A' or 'K'. "
-                                 f"(got {order})")
-
-        return rec_map_array_container(_rec_ravel, a)
+        return gpuarray.reshape(a,-1,order=order)
 
 # }}}
 

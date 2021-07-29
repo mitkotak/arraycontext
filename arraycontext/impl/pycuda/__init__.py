@@ -1,10 +1,10 @@
 """
 .. currentmodule:: arraycontext
-.. autoclass:: PyCudaOpenCLArrayContext
+.. autoclass:: PyCUDAArrayContext
 """
 
 __copyright__ = """
-Copyright (C) 2020-1 University of Illinois Board of Trustees
+Copyright (C) 2021 University of Illinois Board of Trustees
 """
 
 __license__ = """
@@ -38,8 +38,7 @@ from arraycontext.context import ArrayContext
 
 
 if TYPE_CHECKING:
-    import pyopencl
-    import loopy as lp
+    import pycuda
 
 
 # {{{ PyCUDAArrayContext
@@ -51,7 +50,7 @@ class PyCUDAArrayContext(ArrayContext):
 
     .. attribute:: allocator
 
-        A PyOpenCL memory allocator. Can also be `None` (default) or `False` to
+        A PyCUDA memory allocator. Can also be `None` (default) or `False` to
         use the default allocator.
 
     .. automethod:: __init__
@@ -90,7 +89,6 @@ class PyCUDAArrayContext(ArrayContext):
         raise NotImplementedError('Waiting for loopy to be more capable')
 
     def freeze(self, array):
-        array.finish()
         return array
 
     def thaw(self, array):
@@ -99,7 +97,7 @@ class PyCUDAArrayContext(ArrayContext):
     # }}}
 
     def clone(self):
-        return type(self)(self.allocator))
+        return type(self)(self.allocator)
 
     @property
     def permits_inplace_modification(self):

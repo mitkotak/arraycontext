@@ -59,9 +59,11 @@ from .container.traversal import (
 
 from .impl.pyopencl import PyOpenCLArrayContext
 from .impl.pytato import PytatoPyOpenCLArrayContext
+from .impl.pycuda import PyCUDAArrayContext
 
 from .pytest import (
         PytestPyOpenCLArrayContextFactory,
+        PytestPyCUDAArrayContextFactory,
         pytest_generate_tests_for_array_contexts,
         pytest_generate_tests_for_pyopencl_array_context)
 
@@ -89,11 +91,12 @@ __all__ = (
         "thaw", "freeze",
         "from_numpy", "to_numpy",
 
-        "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext",
+        "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext","PyCUDAArrayContext",
 
         "make_loopy_program",
 
         "PytestPyOpenCLArrayContextFactory",
+        "PyCUDAArrayContextFactory",
         "pytest_generate_tests_for_array_contexts",
         "pytest_generate_tests_for_pyopencl_array_context"
         )
