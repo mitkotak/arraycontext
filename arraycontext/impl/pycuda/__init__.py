@@ -99,6 +99,12 @@ class PyCUDAArrayContext(ArrayContext):
     def clone(self):
         return type(self)(self.allocator)
 
+    def tag(self, array):
+        return array
+
+    def tag_axis(self, array):
+        return array
+
     @property
     def permits_inplace_modification(self):
         return True

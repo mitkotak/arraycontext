@@ -35,13 +35,13 @@ from arraycontext import (
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
         PyCUDAArrayContext,
-        ArrayContainer,)
+        ArrayContainer)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
                                  _PytestPytatoPyOpenCLArrayContextFactory,
-                                 _PyCUDAArrayContextFactory)
+                                 _PytestPyCUDAArrayContextFactory)
 
 
 import logging
@@ -94,7 +94,7 @@ class _PytatoPyOpenCLArrayContextForTestsFactory(
 
 
 class _PyCUDAArrayContextForTestsFactory(
-        _PyCUDAArrayContextFactory):
+        _PytestPyCUDAArrayContextFactory):
     actx_class = _PyCUDAArrayContextForTests
 
 

@@ -153,6 +153,9 @@ class _PytestPyCUDAArrayContextFactory(
         return PyCUDAArrayContext
 
     def __call__(self):
+        import pycuda.driver as cuda
+        dev = cuda.init()
+        ctx = dev.make_default_context()
         return self.actx_class(None)
 
 
