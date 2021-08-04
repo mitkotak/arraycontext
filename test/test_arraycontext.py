@@ -98,13 +98,16 @@ class _PyCUDAArrayContextForTestsFactory(
     actx_class = _PyCUDAArrayContextForTests
 
 
-pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-    _PyOpenCLArrayContextForTestsFactory,
-    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    _PytatoPyOpenCLArrayContextForTestsFactory,
-    _PyCUDAArrayContextForTestsFactory,
-    ])
+#pytest_generate_tests = pytest_generate_tests_for_array_contexts([
+    #_PyOpenCLArrayContextForTestsFactory,
+    #_PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    #_PytatoPyOpenCLArrayContextForTestsFactory,
+    #_PyCUDAArrayContextForTestsFactory,
+    #])
 
+pytest_generate_tests = pytest_generate_tests_for_array_contexts([
+    _PyCUDAArrayContextForTestsFactory
+    ])
 
 def _acf():
     import pyopencl as cl
@@ -322,6 +325,8 @@ def test_array_context_np_workalike(actx_factory, sym_name, n_args, dtype):
             ])
 def test_array_context_np_like(actx_factory, sym_name, n_args, dtype):
     actx = actx_factory()
+    if not hasattr(actx.np, sym_name):
+        pytest.skip(f"'{sym_name}' not implemented on '{type(actx).__name__}'")
 
     ndofs = 512
     args = [randn(ndofs, dtype) for i in range(n_args)]

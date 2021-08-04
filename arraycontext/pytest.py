@@ -153,10 +153,64 @@ class _PytestPyCUDAArrayContextFactory(
         return PyCUDAArrayContext
 
     def __call__(self):
+        def make_default_context(ctx_maker=None):
+            if ctx_maker is None:
+
+                def ctx_maker(dev):
+                    return dev.make_context()
+
+            ndevices = cuda.Device.count()
+            if ndevices == 0:
+                raise RuntimeError(
+                    "No CUDA enabled device found. " "Please check your installation."
+                )
+
+            # Is CUDA_DEVICE set?
+            import os
+
+            devn = os.environ.get("CUDA_DEVICE")
+
+            # Is $HOME/.cuda_device set ?
+            if devn is None:
+                try:
+                    homedir = os.environ.get("HOME")
+                    assert homedir is not None
+                    devn = open(os.path.join(homedir, ".cuda_device")).read().strip()
+                except Exception:
+                    pass
+
+            # If either CUDA_DEVICE or $HOME/.cuda_device is set, try to use it
+            if devn is not None:
+                try:
+                    devn = int(devn)
+                except TypeError:
+                    raise TypeError(
+                        "CUDA device number (CUDA_DEVICE or ~/.cuda_device)"
+                        " must be an integer"
+                    )
+
+                dev = cuda.Device(devn)
+                return ctx_maker(dev)
+
+            # Otherwise, try to use any available device
+            else:
+                for devn in range(ndevices):
+                    dev = cuda.Device(devn)
+                    try:
+                        return ctx_maker(dev)
+                    except cuda.Error:
+                        pass
+
+                raise RuntimeError(
+                    "make_default_context() wasn't able to create a context "
+                    "on any of the %d detected devices" % ndevices
+                )
+
         import pycuda.driver as cuda
-        dev = cuda.init()
-        ctx = dev.make_default_context()
-        return self.actx_class(None)
+        actx_class = self.actx_class(None)
+        cuda.init()
+        ctx = make_default_context()
+        return actx_class
 
 
 _ARRAY_CONTEXT_FACTORY_REGISTRY: \
