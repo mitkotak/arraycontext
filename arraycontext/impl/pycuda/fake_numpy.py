@@ -36,6 +36,8 @@ from arraycontext.container.traversal import (
         rec_map_reduce_array_container,
         )
 
+import pycuda 
+
 try:
     import pycuda.gpuarray as gpuarray
 except ImportError:
@@ -47,6 +49,17 @@ except ImportError:
 class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     def _get_fake_numpy_linalg_namespace(self):
         return _PyCUDAFakeNumpyLinalgNamespace(self._array_context)
+
+    def __getattr__(self, name):
+        print(name)
+        pycuda_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
+                    "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
+                    "sqrt", "exp"]
+        if name in pycuda_funcs:
+            from functools import partial
+            return partial(rec_map_array_container, getattr(pycuda, name))
+        
+        return super().__getattr__(name)
 
     # {{{ comparisons
 
@@ -84,7 +97,12 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
         return rec_multimap_array_container(gpuarray.minimum,x, y)
 
     def where(self, criterion, then, else_):
-        return rec_multimap_array_container(gpuarray.where, criterion, then, else_)
+        def where_inner(inner_crit, inner_then, inner_else):
+            if isinstance(inner_crit, bool):
+                return inner_then if inner_crit else inner_else
+            return gpuarray.if_positive(inner_crit != 0, inner_then, inner_else)
+
+        return rec_multimap_array_container(where_inner, criterion, then, else_)
 
     def sum(self, a, dtype=None):
         def _gpuarray_sum(ary):
@@ -97,16 +115,15 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
 
     def min(self, a):
         return rec_map_reduce_array_container(
-                partial(reduce, gpuarray.minimum), gpuarray.amin, a)
+                partial(reduce, partial(gpuarray.minimum)),partial(gpuarray.min),a)
 
     def max(self, a):
         return rec_map_reduce_array_container(
-                partial(reduce, gpuarray.maximum), gpuarray.amax, a)
+                partial(reduce, partial(gpuarray.maximum)), partial(gpuarray.max), a)
 
     def stack(self, arrays, axis=0):
-        return rec_multimap_array_container(
-                lambda *args: gpuarray.stack(arrays=args, axis=axis,
-                    self._array_context.allocator),
+         return rec_multimap_array_container(
+                lambda *args: gpuarray.stack(arrays=args, axis=axis),
                 *arrays)
 
     def reshape(self, a, newshape):

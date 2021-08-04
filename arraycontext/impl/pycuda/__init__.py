@@ -57,9 +57,14 @@ class PyCUDAArrayContext(ArrayContext):
     """
 
     def __init__(self, allocator=None):
+        import pycuda
         super().__init__()
-        self.allocator = allocator
-
+        if allocator == None:
+            self.allocator =  pycuda.driver.mem_alloc
+            from warnings import warn
+            warn("Allocator is None")
+        else:
+            self.allocator = allocator
 
     def _get_fake_numpy_namespace(self):
         from arraycontext.impl.pycuda.fake_numpy import PyCUDAFakeNumpyNamespace
