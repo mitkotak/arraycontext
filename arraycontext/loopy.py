@@ -70,7 +70,7 @@ def get_default_entrypoint(t_unit):
 
 # }}}
 
-class BaseFakeNumpyNamespace:
+class LoopyBasedFakeNumpyNamespace:
     _numpy_to_c_arc_functions = {
             "arcsin": "asin",
             "arccos": "acos",
