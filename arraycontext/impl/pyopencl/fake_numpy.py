@@ -49,6 +49,17 @@ class PyOpenCLFakeNumpyNamespace(BaseFakeNumpyNamespace):
     def _get_fake_numpy_linalg_namespace(self):
         return _PyOpenCLFakeNumpyLinalgNamespace(self._array_context)
 
+    def __getattr__(self, name):
+        print(name)
+        cl_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
+                    "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
+                    "sqrt", "exp"]
+        if name in cl_funcs:
+            from functools import partial
+            return partial(rec_map_array_container, getattr(cl, name))
+        
+        return super().__getattr__(name)
+        
     # {{{ comparisons
 
     # FIXME: This should be documentation, not a comment.
