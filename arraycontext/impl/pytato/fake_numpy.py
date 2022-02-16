@@ -23,10 +23,15 @@ THE SOFTWARE.
 """
 from functools import partial, reduce
 
-from arraycontext.fake_numpy import \
+import numpy as np
+
+from arraycontext.fake_numpy import (
         BaseFakeNumpyLinalgNamespace
-from arraycontext.loopy import \
+        )
+from arraycontext.loopy import (
         LoopyBasedFakeNumpyNamespace
+        )
+from arraycontext.container import NotAnArrayContainerError, serialize_container
 from arraycontext.container.traversal import (
         rec_multimap_array_container, rec_map_array_container,
         rec_map_reduce_array_container,
@@ -48,91 +53,45 @@ class PytatoFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
         :mod:`pytato` does not define any memory layout for its arrays. See
         :ref:`Pytato docs <pytato:memory-layout>` for more on this.
     """
+
+    _pt_funcs = frozenset({
+        "sin", "cos", "tan", "arcsin", "arccos", "arctan",
+        "sinh", "cosh", "tanh", "exp", "log", "log10",
+        "sqrt", "abs", "isnan"
+        })
+
     def _get_fake_numpy_linalg_namespace(self):
         return PytatoFakeNumpyLinalgNamespace(self._array_context)
 
     def __getattr__(self, name):
-
-        pt_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
-                    "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
-                    "sqrt", "exp"]
-        if name in pt_funcs:
+        if name in self._pt_funcs:
             from functools import partial
             return partial(rec_map_array_container, getattr(pt, name))
 
         return super().__getattr__(name)
 
-    def reshape(self, a, newshape):
-        return rec_multimap_array_container(pt.reshape, a, newshape)
+    # NOTE: the order of these follows the order in numpy docs
+    # NOTE: when adding a function here, also add it to `array_context.rst` docs!
 
-    def transpose(self, a, axes=None):
-        return rec_multimap_array_container(pt.transpose, a, axes)
-
-    def concatenate(self, arrays, axis=0):
-        return rec_multimap_array_container(pt.concatenate, arrays, axis)
+    # {{{ array creation routines
 
     def ones_like(self, ary):
-        def _ones_like(subary):
-            return pt.ones(subary.shape, subary.dtype)
+        return self.full_like(ary, 1)
 
-        return self._new_like(ary, _ones_like)
+    def full_like(self, ary, fill_value):
+        def _full_like(subary):
+            return pt.full(subary.shape, fill_value, subary.dtype)
 
-    def maximum(self, x, y):
-        return rec_multimap_array_container(pt.maximum, x, y)
+        return self._new_like(ary, _full_like)
 
-    def minimum(self, x, y):
-        return rec_multimap_array_container(pt.minimum, x, y)
+    # }}}
 
-    def where(self, criterion, then, else_):
-        return rec_multimap_array_container(pt.where, criterion, then, else_)
+    # {{{ array manipulation routines
 
-    def sum(self, a, dtype=None):
-        def _pt_sum(ary):
-            if dtype not in [ary.dtype, None]:
-                raise NotImplementedError
-
-            return pt.sum(ary)
-
-        return rec_map_reduce_array_container(sum, _pt_sum, a)
-
-    def min(self, a):
-        return rec_map_reduce_array_container(
-                partial(reduce, pt.minimum), pt.amin, a)
-
-    def max(self, a):
-        return rec_map_reduce_array_container(
-                partial(reduce, pt.maximum), pt.amax, a)
-
-    def stack(self, arrays, axis=0):
-        return rec_multimap_array_container(
-                lambda *args: pt.stack(arrays=args, axis=axis),
-                *arrays)
-
-    # {{{ relational operators
-
-    def equal(self, x, y):
-        return rec_multimap_array_container(pt.equal, x, y)
-
-    def not_equal(self, x, y):
-        return rec_multimap_array_container(pt.not_equal, x, y)
-
-    def greater(self, x, y):
-        return rec_multimap_array_container(pt.greater, x, y)
-
-    def greater_equal(self, x, y):
-        return rec_multimap_array_container(pt.greater_equal, x, y)
-
-    def less(self, x, y):
-        return rec_multimap_array_container(pt.less, x, y)
-
-    def less_equal(self, x, y):
-        return rec_multimap_array_container(pt.less_equal, x, y)
-
-    def conj(self, x):
-        return rec_multimap_array_container(pt.conj, x)
-
-    def arctan2(self, y, x):
-        return rec_multimap_array_container(pt.arctan2, y, x)
+    def reshape(self, a, newshape, order="C"):
+        return rec_map_array_container(
+                lambda ary: pt.reshape(a, newshape, order=order),
+                a)
 
     def ravel(self, a, order="C"):
         """
@@ -155,5 +114,123 @@ class PytatoFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
                                  f"(got {order})")
 
         return rec_map_array_container(_rec_ravel, a)
+
+    def transpose(self, a, axes=None):
+        return rec_multimap_array_container(pt.transpose, a, axes)
+
+    def broadcast_to(self, array, shape):
+        return rec_map_array_container(partial(pt.broadcast_to, shape=shape), array)
+
+    def concatenate(self, arrays, axis=0):
+        return rec_multimap_array_container(pt.concatenate, arrays, axis)
+
+    def stack(self, arrays, axis=0):
+        return rec_multimap_array_container(
+                lambda *args: pt.stack(arrays=args, axis=axis),
+                *arrays)
+
+    # }}}
+
+    # {{{ logic functions
+
+    def all(self, a):
+        return rec_map_reduce_array_container(
+                partial(reduce, pt.logical_and),
+                lambda subary: pt.all(subary), a)
+
+    def any(self, a):
+        return rec_map_reduce_array_container(
+                partial(reduce, pt.logical_or),
+                lambda subary: pt.any(subary), a)
+
+    def array_equal(self, a, b):
+        actx = self._array_context
+
+        # NOTE: not all backends support `bool` properly, so use `int8` instead
+        false = actx.from_numpy(np.int8(False))
+
+        def rec_equal(x, y):
+            if type(x) != type(y):
+                return false
+
+            try:
+                iterable = zip(serialize_container(x), serialize_container(y))
+            except NotAnArrayContainerError:
+                if x.shape != y.shape:
+                    return false
+                else:
+                    return pt.all(pt.equal(x, y))
+            else:
+                return reduce(
+                        pt.logical_and,
+                        [rec_equal(ix, iy) for (_, ix), (_, iy) in iterable]
+                        )
+
+        return rec_equal(a, b)
+
+    def greater(self, x, y):
+        return rec_multimap_array_container(pt.greater, x, y)
+
+    def greater_equal(self, x, y):
+        return rec_multimap_array_container(pt.greater_equal, x, y)
+
+    def less(self, x, y):
+        return rec_multimap_array_container(pt.less, x, y)
+
+    def less_equal(self, x, y):
+        return rec_multimap_array_container(pt.less_equal, x, y)
+
+    def equal(self, x, y):
+        return rec_multimap_array_container(pt.equal, x, y)
+
+    def not_equal(self, x, y):
+        return rec_multimap_array_container(pt.not_equal, x, y)
+
+    # }}}
+
+    # {{{ mathematical functions
+
+    def arctan2(self, y, x):
+        return rec_multimap_array_container(pt.arctan2, y, x)
+
+    def sum(self, a, axis=None, dtype=None):
+        def _pt_sum(ary):
+            if dtype not in [ary.dtype, None]:
+                raise NotImplementedError
+
+            return pt.sum(ary, axis=axis)
+
+        return rec_map_reduce_array_container(sum, _pt_sum, a)
+
+    def conj(self, x):
+        return rec_multimap_array_container(pt.conj, x)
+
+    def maximum(self, x, y):
+        return rec_multimap_array_container(pt.maximum, x, y)
+
+    def amax(self, a, axis=None):
+        return rec_map_reduce_array_container(
+                partial(reduce, pt.maximum), partial(pt.amax, axis=axis), a)
+
+    max = amax
+
+    def minimum(self, x, y):
+        return rec_multimap_array_container(pt.minimum, x, y)
+
+    def amin(self, a, axis=None):
+        return rec_map_reduce_array_container(
+                partial(reduce, pt.minimum), partial(pt.amin, axis=axis), a)
+
+    min = amin
+
+    def absolute(self, a):
+        return self.abs(a)
+
+    # }}}
+
+    # {{{ sorting, searching, and counting
+
+    def where(self, criterion, then, else_):
+        return rec_multimap_array_container(pt.where, criterion, then, else_)
 
     # }}}

@@ -166,6 +166,10 @@ class DOFArray:
         return (f"{template_instance_name}.array_context, tuple([{arg}])")
 
     @property
+    def size(self):
+        return sum(ary.size for ary in self.data)
+
+    @property
     def real(self):
         return DOFArray(self.array_context, tuple([subary.real for subary in self]))
 
@@ -705,6 +709,82 @@ def _get_test_containers(actx, ambient_dim=2):
             bcast_dataclass_of_dofs)
 
 
+def test_container_scalar_map(actx_factory):
+    actx = actx_factory()
+
+    arys = _get_test_containers(actx, shapes=0)
+    arys += (np.pi,)
+
+    from arraycontext import (
+            map_array_container, rec_map_array_container,
+            map_reduce_array_container, rec_map_reduce_array_container,
+            )
+
+    for ary in arys:
+        result = map_array_container(lambda x: x, ary)
+        assert result is not None
+        result = rec_map_array_container(lambda x: x, ary)
+        assert result is not None
+
+        result = map_reduce_array_container(np.shape, lambda x: x, ary)
+        assert result is not None
+        result = rec_map_reduce_array_container(np.shape, lambda x: x, ary)
+        assert result is not None
+
+
+def test_container_map(actx_factory):
+    actx = actx_factory()
+    ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs, bcast_dc_of_dofs = \
+            _get_test_containers(actx)
+
+    # {{{ check
+
+    def _check_allclose(f, arg1, arg2, atol=2.0e-14):
+        from arraycontext import NotAnArrayContainerError
+        try:
+            arg1_iterable = serialize_container(arg1)
+            arg2_iterable = serialize_container(arg2)
+        except NotAnArrayContainerError:
+            assert np.linalg.norm(actx.to_numpy(f(arg1) - arg2)) < atol
+        else:
+            arg1_subarrays = [
+                subarray for _, subarray in arg1_iterable]
+            arg2_subarrays = [
+                subarray for _, subarray in arg2_iterable]
+            for subarray1, subarray2 in zip(arg1_subarrays, arg2_subarrays):
+                _check_allclose(f, subarray1, subarray2)
+
+    def func(x):
+        return x + 1
+
+    from arraycontext import rec_map_array_container
+    result = rec_map_array_container(func, 1)
+    assert result == 2
+
+    for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
+        result = rec_map_array_container(func, ary)
+        _check_allclose(func, ary, result)
+
+    from arraycontext import mapped_over_array_containers
+
+    @mapped_over_array_containers
+    def mapped_func(x):
+        return func(x)
+
+    for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
+        result = mapped_func(ary)
+        _check_allclose(func, ary, result)
+
+    @mapped_over_array_containers(leaf_class=DOFArray)
+    def check_leaf(x):
+        assert isinstance(x, DOFArray)
+
+    for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
+        check_leaf(ary)
+
+    # }}}
+
+
 def test_container_multimap(actx_factory):
     actx = actx_factory()
     ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs, bcast_dc_of_dofs = \
@@ -713,7 +793,19 @@ def test_container_multimap(actx_factory):
     # {{{ check
 
     def _check_allclose(f, arg1, arg2, atol=2.0e-14):
-        assert np.linalg.norm(actx.to_numpy(f(arg1) - arg2)) < atol
+        from arraycontext import NotAnArrayContainerError
+        try:
+            arg1_iterable = serialize_container(arg1)
+            arg2_iterable = serialize_container(arg2)
+        except NotAnArrayContainerError:
+            assert np.linalg.norm(actx.to_numpy(f(arg1) - arg2)) < atol
+        else:
+            arg1_subarrays = [
+                subarray for _, subarray in arg1_iterable]
+            arg2_subarrays = [
+                subarray for _, subarray in arg2_iterable]
+            for subarray1, subarray2 in zip(arg1_subarrays, arg2_subarrays):
+                _check_allclose(f, subarray1, subarray2)
 
     def func_all_scalar(x, y):
         return x + y
@@ -728,17 +820,30 @@ def test_container_multimap(actx_factory):
     result = rec_multimap_array_container(func_all_scalar, 1, 2)
     assert result == 3
 
-    from functools import partial
     for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
         result = rec_multimap_array_container(func_first_scalar, 1, ary)
-        rec_multimap_array_container(
-                partial(_check_allclose, lambda x: 1 + x),
-                ary, result)
+        _check_allclose(lambda x: 1 + x, ary, result)
 
         result = rec_multimap_array_container(func_multiple_scalar, 2, ary, 2, ary)
-        rec_multimap_array_container(
-                partial(_check_allclose, lambda x: 4 * x),
-                ary, result)
+        _check_allclose(lambda x: 4 * x, ary, result)
+
+    from arraycontext import multimapped_over_array_containers
+
+    @multimapped_over_array_containers
+    def mapped_func(a, subary1, b, subary2):
+        return func_multiple_scalar(a, subary1, b, subary2)
+
+    for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
+        result = mapped_func(2, ary, 2, ary)
+        _check_allclose(lambda x: 4 * x, ary, result)
+
+    @multimapped_over_array_containers(leaf_class=DOFArray)
+    def check_leaf(a, subary1, b, subary2):
+        assert isinstance(subary1, DOFArray)
+        assert isinstance(subary2, DOFArray)
+
+    for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
+        check_leaf(2, ary, 2, ary)
 
     with pytest.raises(AssertionError):
         rec_multimap_array_container(func_multiple_scalar, 2, ary_dof, 2, dc_of_dofs)
@@ -852,6 +957,111 @@ def test_container_norm(actx_factory, ord):
     n2 = np.linalg.norm([1, 2, 3, 5]*2, ord)
 
     assert abs(n1 - n2) < 1e-12
+
+# }}}
+
+
+# {{{ test flatten and unflatten
+
+@pytest.mark.parametrize("shapes", [
+    0,                          # tests device scalars when flattening
+    512,
+    [(128, 67)],
+    [(127, 67), (18, 0)],       # tests 0-sized arrays
+    [(64, 7), (154, 12)]
+    ])
+def test_flatten_array_container(actx_factory, shapes):
+    if np.prod(shapes) == 0:
+        # https://github.com/inducer/loopy/pull/497
+        # NOTE: only fails for the pytato array context at the moment
+        pytest.xfail("strides do not match in subary")
+
+    actx = actx_factory()
+
+    from arraycontext import flatten, unflatten
+    arys = _get_test_containers(actx, shapes=shapes)
+
+    for ary in arys:
+        flat = flatten(ary, actx)
+        assert flat.ndim == 1
+
+        ary_roundtrip = unflatten(ary, flat, actx)
+
+        from arraycontext import rec_multimap_reduce_array_container
+        assert rec_multimap_reduce_array_container(
+                np.prod,
+                lambda x, y: x.shape == y.shape,
+                ary, ary_roundtrip)
+
+        assert actx.to_numpy(
+                actx.np.linalg.norm(ary - ary_roundtrip)
+                ) < 1.0e-15
+
+    # {{{ complex to real
+
+    if isinstance(shapes, (int, tuple)):
+        shapes = [shapes]
+
+    ary = DOFArray(actx, tuple([
+        actx.from_numpy(randn(shape, np.float64))
+        for shape in shapes]))
+
+    template = DOFArray(actx, tuple([
+        actx.from_numpy(randn(shape, np.complex128))
+        for shape in shapes]))
+
+    flat = flatten(ary, actx)
+    ary_roundtrip = unflatten(template, flat, actx, strict=False)
+
+    assert actx.to_numpy(
+            actx.np.linalg.norm(ary - ary_roundtrip)
+            ) < 1.0e-15
+
+    # }}}
+
+
+def test_flatten_array_container_failure(actx_factory):
+    actx = actx_factory()
+
+    from arraycontext import flatten, unflatten
+    ary = _get_test_containers(actx, shapes=512)[0]
+    flat_ary = flatten(ary, actx)
+
+    with pytest.raises(TypeError):
+        # cannot unflatten from a numpy array
+        unflatten(ary, actx.to_numpy(flat_ary), actx)
+
+    with pytest.raises(ValueError):
+        # cannot unflatten non-flat arrays
+        unflatten(ary, flat_ary.reshape(2, -1), actx)
+
+    with pytest.raises(ValueError):
+        # cannot unflatten partially
+        unflatten(ary, flat_ary[:-1], actx)
+
+
+def test_flatten_with_leaf_class(actx_factory):
+    actx = actx_factory()
+
+    from arraycontext import flatten
+    arys = _get_test_containers(actx, shapes=512)
+
+    flat = flatten(arys[0], actx, leaf_class=DOFArray)
+    assert isinstance(flat, actx.array_types)
+    assert flat.shape == (arys[0].size,)
+
+    flat = flatten(arys[1], actx, leaf_class=DOFArray)
+    assert isinstance(flat, np.ndarray) and flat.dtype == object
+    assert all(isinstance(entry, actx.array_types) for entry in flat)
+    assert all(entry.shape == (arys[0].size,) for entry in flat)
+
+    flat = flatten(arys[3], actx, leaf_class=DOFArray)
+    assert isinstance(flat, MyContainer)
+    assert isinstance(flat.mass, actx.array_types)
+    assert flat.mass.shape == (arys[3].mass.size,)
+    assert isinstance(flat.enthalpy, actx.array_types)
+    assert flat.enthalpy.shape == (arys[3].enthalpy.size,)
+    assert all(isinstance(entry, actx.array_types) for entry in flat.momentum)
 
 # }}}
 
@@ -1052,6 +1262,118 @@ def test_leaf_array_type_broadcasting(actx_factory):
                                    actx.to_numpy(quuz.u[0]))
 
 # }}}
+
+
+# {{{ test outer product
+
+def test_outer(actx_factory):
+    actx = actx_factory()
+
+    a_dof, a_ary_of_dofs, _, _, a_bcast_dc_of_dofs = _get_test_containers(actx)
+
+    b_dof = a_dof + 1
+    b_ary_of_dofs = a_ary_of_dofs + 1
+    b_bcast_dc_of_dofs = a_bcast_dc_of_dofs + 1
+
+    from arraycontext import outer
+
+    def equal(a, b):
+        return actx.to_numpy(actx.np.array_equal(a, b))
+
+    # Two scalars
+    assert equal(outer(a_dof, b_dof), a_dof*b_dof)
+
+    # Scalar and vector
+    assert equal(outer(a_dof, b_ary_of_dofs), a_dof*b_ary_of_dofs)
+
+    # Vector and scalar
+    assert equal(outer(a_ary_of_dofs, b_dof), a_ary_of_dofs*b_dof)
+
+    # Two vectors
+    assert equal(
+        outer(a_ary_of_dofs, b_ary_of_dofs),
+        np.outer(a_ary_of_dofs, b_ary_of_dofs))
+
+    # Scalar and array container
+    assert equal(
+        outer(a_dof, b_bcast_dc_of_dofs),
+        a_dof*b_bcast_dc_of_dofs)
+
+    # Array container and scalar
+    assert equal(
+        outer(a_bcast_dc_of_dofs, b_dof),
+        a_bcast_dc_of_dofs*b_dof)
+
+    # Vector and array container
+    assert equal(
+        outer(a_ary_of_dofs, b_bcast_dc_of_dofs),
+        make_obj_array([a_i*b_bcast_dc_of_dofs for a_i in a_ary_of_dofs]))
+
+    # Array container and vector
+    assert equal(
+        outer(a_bcast_dc_of_dofs, b_ary_of_dofs),
+        MyContainerDOFBcast(
+            name="container",
+            mass=a_bcast_dc_of_dofs.mass*b_ary_of_dofs,
+            momentum=np.outer(a_bcast_dc_of_dofs.momentum, b_ary_of_dofs),
+            enthalpy=a_bcast_dc_of_dofs.enthalpy*b_ary_of_dofs))
+
+    # Two array containers
+    assert equal(
+        outer(a_bcast_dc_of_dofs, b_bcast_dc_of_dofs),
+        MyContainerDOFBcast(
+            name="container",
+            mass=a_bcast_dc_of_dofs.mass*b_bcast_dc_of_dofs.mass,
+            momentum=np.outer(
+                a_bcast_dc_of_dofs.momentum,
+                b_bcast_dc_of_dofs.momentum),
+            enthalpy=a_bcast_dc_of_dofs.enthalpy*b_bcast_dc_of_dofs.enthalpy))
+
+    # Non-object numpy arrays should be treated as scalars
+    ary_of_floats = np.ones(len(b_bcast_dc_of_dofs.mass))
+    assert equal(
+        outer(ary_of_floats, b_bcast_dc_of_dofs),
+        ary_of_floats*b_bcast_dc_of_dofs)
+    assert equal(
+        outer(a_bcast_dc_of_dofs, ary_of_floats),
+        a_bcast_dc_of_dofs*ary_of_floats)
+
+# }}}
+
+
+# {{{ test_array_container_with_numpy
+
+@with_container_arithmetic(bcast_obj_array=True, rel_comparison=True)
+@dataclass_array_container
+@dataclass(frozen=True)
+class ArrayContainerWithNumpy:
+    u: np.ndarray
+    v: DOFArray
+
+
+def test_array_container_with_numpy(actx_factory):
+    actx = actx_factory()
+
+    mystate = ArrayContainerWithNumpy(
+            u=np.zeros(10),
+            v=DOFArray(actx, (actx.from_numpy(np.zeros(42)),)),
+            )
+
+    from arraycontext import rec_map_array_container
+    rec_map_array_container(lambda x: x, mystate)
+
+
+# }}}
+
+
+def test_actx_compile_on_pure_array_return(actx_factory):
+    def _twice(x):
+        return 2 * x
+
+    actx = actx_factory()
+    ones = actx.zeros(shape=(10, 4), dtype=np.float64) + 1
+    np.testing.assert_allclose(actx.to_numpy(_twice(ones)),
+                               actx.to_numpy(actx.compile(_twice)(ones)))
 
 
 if __name__ == "__main__":

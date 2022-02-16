@@ -29,10 +29,15 @@ THE SOFTWARE.
 from functools import partial, reduce
 import operator
 
-from arraycontext.fake_numpy import \
+import numpy as np
+
+from arraycontext.fake_numpy import (
         BaseFakeNumpyLinalgNamespace
-from arraycontext.loopy import \
+        )
+from arraycontext.loopy import (
         LoopyBasedFakeNumpyNamespace
+        )
+from arraycontext.container import NotAnArrayContainerError, serialize_container
 from arraycontext.container.traversal import (
         rec_multimap_array_container, rec_map_array_container,
         rec_map_reduce_array_container,
@@ -51,131 +56,34 @@ class PyOpenCLFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
     def _get_fake_numpy_linalg_namespace(self):
         return _PyOpenCLFakeNumpyLinalgNamespace(self._array_context)
 
-    def __getattr__(self, name):
-        print(name)
-        cl_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
-                    "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
-                    "sqrt", "exp"]
-        if name in cl_funcs:
-            from functools import partial
-            return partial(rec_map_array_container, getattr(cl, name))
-        
-        return super().__getattr__(name)
-        
-    # {{{ comparisons
+    # NOTE: the order of these follows the order in numpy docs
+    # NOTE: when adding a function here, also add it to `array_context.rst` docs!
 
-    # FIXME: This should be documentation, not a comment.
-    # These are here mainly because some arrays may choose to interpret
-    # equality comparison as a binary predicate of structural identity,
-    # i.e. more like "are you two equal", and not like numpy semantics.
-    # These operations provide access to numpy-style comparisons in that
-    # case.
+    # {{{ array creation routines
 
-    def __getattr__(self, name):
-        print(name)
-        cl_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
-                    "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
-                    "sqrt", "exp"]
-        if name in cl_funcs:
-            from functools import partial
-            return partial(rec_map_array_container, getattr(cl, name))
+    def ones_like(self, ary):
+        return self.full_like(ary, 1)
 
-        return super().__getattr__(name)
+    def full_like(self, ary, fill_value):
+        def _full_like(subary):
+            ones = self._array_context.empty_like(subary)
+            ones.fill(fill_value)
+            return ones
 
-    def equal(self, x, y):
-        return rec_multimap_array_container(operator.eq, x, y)
+        return self._new_like(ary, _full_like)
 
-    def not_equal(self, x, y):
-        return rec_multimap_array_container(operator.ne, x, y)
+    def copy(self, ary):
+        def _copy(subary):
+            return subary.copy(queue=self._array_context.queue)
 
-    def greater(self, x, y):
-        return rec_multimap_array_container(operator.gt, x, y)
-
-    def greater_equal(self, x, y):
-        return rec_multimap_array_container(operator.ge, x, y)
-
-    def less(self, x, y):
-        return rec_multimap_array_container(operator.lt, x, y)
-
-    def less_equal(self, x, y):
-        return rec_multimap_array_container(operator.le, x, y)
+        return self._new_like(ary, _copy)
 
     # }}}
 
-    def ones_like(self, ary):
-        def _ones_like(subary):
-            ones = self._array_context.empty_like(subary)
-            ones.fill(1)
-            return ones
-
-        return self._new_like(ary, _ones_like)
-
-    def maximum(self, x, y):
-        return rec_multimap_array_container(
-                partial(cl_array.maximum, queue=self._array_context.queue),
-                x, y)
-
-    def minimum(self, x, y):
-        return rec_multimap_array_container(
-                partial(cl_array.minimum, queue=self._array_context.queue),
-                x, y)
-
-    def where(self, criterion, then, else_):
-        def where_inner(inner_crit, inner_then, inner_else):
-            if isinstance(inner_crit, bool):
-                return inner_then if inner_crit else inner_else
-            return cl_array.if_positive(inner_crit != 0, inner_then, inner_else,
-                    queue=self._array_context.queue)
-
-        return rec_multimap_array_container(where_inner, criterion, then, else_)
-
-    def sum(self, a, dtype=None):
-        result = rec_map_reduce_array_container(
-                sum,
-                partial(cl_array.sum, dtype=dtype, queue=self._array_context.queue),
-                a)
-
-        if not self._array_context._force_device_scalars:
-            result = result.get()[()]
-        return result
-
-    def min(self, a):
-        queue = self._array_context.queue
-        result = rec_map_reduce_array_container(
-                partial(reduce, partial(cl_array.minimum, queue=queue)),
-                partial(cl_array.min, queue=queue),
-                a)
-
-        if not self._array_context._force_device_scalars:
-            result = result.get()[()]
-        return result
-
-    def max(self, a):
-        queue = self._array_context.queue
-        result = rec_map_reduce_array_container(
-                partial(reduce, partial(cl_array.maximum, queue=queue)),
-                partial(cl_array.max, queue=queue),
-                a)
-
-        if not self._array_context._force_device_scalars:
-            result = result.get()[()]
-        return result
-
-    def stack(self, arrays, axis=0):
-        return rec_multimap_array_container(
-                lambda *args: cl_array.stack(arrays=args, axis=axis,
-                    queue=self._array_context.queue),
-                *arrays)
+    # {{{ array manipulation routines
 
     def reshape(self, a, newshape):
         return cl_array.reshape(a, newshape)
-
-    def concatenate(self, arrays, axis=0):
-        return cl_array.concatenate(
-            arrays, axis,
-            self._array_context.queue,
-            self._array_context.allocator
-        )
 
     def ravel(self, a, order="C"):
         def _rec_ravel(a):
@@ -199,12 +107,44 @@ class PyOpenCLFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
 
         return rec_map_array_container(_rec_ravel, a)
 
+    def concatenate(self, arrays, axis=0):
+        return cl_array.concatenate(
+            arrays, axis,
+            self._array_context.queue,
+            self._array_context.allocator
+        )
+
+    def stack(self, arrays, axis=0):
+        return rec_multimap_array_container(
+                lambda *args: cl_array.stack(arrays=args, axis=axis,
+                    queue=self._array_context.queue),
+                *arrays)
+
+    # }}}
+
+    # {{{ linear algebra
+
     def vdot(self, x, y, dtype=None):
         from arraycontext import rec_multimap_reduce_array_container
         result = rec_multimap_reduce_array_container(
                 sum,
                 partial(cl_array.vdot, dtype=dtype, queue=self._array_context.queue),
                 x, y)
+
+        if not self._array_context._force_device_scalars:
+            result = result.get()[()]
+        return result
+
+    # }}}
+
+    # {{{ logic functions
+
+    def all(self, a):
+        queue = self._array_context.queue
+        result = rec_map_reduce_array_container(
+                partial(reduce, partial(cl_array.minimum, queue=queue)),
+                lambda subary: subary.all(queue=queue),
+                a)
 
         if not self._array_context._force_device_scalars:
             result = result.get()[()]
@@ -221,16 +161,153 @@ class PyOpenCLFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
             result = result.get()[()]
         return result
 
-    def all(self, a):
+    def array_equal(self, a, b):
+        actx = self._array_context
+        queue = actx.queue
+
+        # NOTE: pyopencl doesn't like `bool` much, so use `int8` instead
+        false = actx.from_numpy(np.int8(False))
+
+        def rec_equal(x, y):
+            if type(x) != type(y):
+                return false
+
+            try:
+                iterable = zip(serialize_container(x), serialize_container(y))
+            except NotAnArrayContainerError:
+                if x.shape != y.shape:
+                    return false
+                else:
+                    return (x == y).all()
+            else:
+                return reduce(
+                        partial(cl_array.minimum, queue=queue),
+                        [rec_equal(ix, iy)for (_, ix), (_, iy) in iterable]
+                        )
+
+        result = rec_equal(a, b)
+        if not self._array_context._force_device_scalars:
+            result = result.get()[()]
+
+        return result
+
+    # FIXME: This should be documentation, not a comment.
+    # These are here mainly because some arrays may choose to interpret
+    # equality comparison as a binary predicate of structural identity,
+    # i.e. more like "are you two equal", and not like numpy semantics.
+    # These operations provide access to numpy-style comparisons in that
+    # case.
+
+    def greater(self, x, y):
+        return rec_multimap_array_container(operator.gt, x, y)
+
+    def greater_equal(self, x, y):
+        return rec_multimap_array_container(operator.ge, x, y)
+
+    def less(self, x, y):
+        return rec_multimap_array_container(operator.lt, x, y)
+
+    def less_equal(self, x, y):
+        return rec_multimap_array_container(operator.le, x, y)
+
+    def equal(self, x, y):
+        return rec_multimap_array_container(operator.eq, x, y)
+
+    def not_equal(self, x, y):
+        return rec_multimap_array_container(operator.ne, x, y)
+
+    # }}}
+
+    # {{{ mathematical functions
+
+    def sum(self, a, axis=None, dtype=None):
+        if isinstance(axis, int):
+            axis = axis,
+
+        def _rec_sum(ary):
+            if axis not in [None, tuple(range(ary.ndim))]:
+                raise NotImplementedError(f"Sum over '{axis}' axes not supported.")
+
+            return cl_array.sum(ary, dtype=dtype, queue=self._array_context.queue)
+
+        result = rec_map_reduce_array_container(sum, _rec_sum, a)
+
+        if not self._array_context._force_device_scalars:
+            result = result.get()[()]
+        return result
+
+    def maximum(self, x, y):
+        return rec_multimap_array_container(
+                partial(cl_array.maximum, queue=self._array_context.queue),
+                x, y)
+
+    def amax(self, a, axis=None):
         queue = self._array_context.queue
+
+        if isinstance(axis, int):
+            axis = axis,
+
+        def _rec_max(ary):
+            if axis not in [None, tuple(range(ary.ndim))]:
+                raise NotImplementedError(f"Max. over '{axis}' axes not supported.")
+            return cl_array.max(ary, queue=queue)
+
         result = rec_map_reduce_array_container(
-                partial(reduce, partial(cl_array.minimum, queue=queue)),
-                lambda subary: subary.all(queue=queue),
+                partial(reduce, partial(cl_array.maximum, queue=queue)),
+                _rec_max,
                 a)
 
         if not self._array_context._force_device_scalars:
             result = result.get()[()]
         return result
+
+    max = amax
+
+    def minimum(self, x, y):
+        return rec_multimap_array_container(
+                partial(cl_array.minimum, queue=self._array_context.queue),
+                x, y)
+
+    def amin(self, a, axis=None):
+        queue = self._array_context.queue
+
+        if isinstance(axis, int):
+            axis = axis,
+
+        def _rec_min(ary):
+            if axis not in [None, tuple(range(ary.ndim))]:
+                raise NotImplementedError(f"Min. over '{axis}' axes not supported.")
+            return cl_array.min(ary, queue=queue)
+
+        result = rec_map_reduce_array_container(
+                partial(reduce, partial(cl_array.minimum, queue=queue)),
+                _rec_min,
+                a)
+
+        if not self._array_context._force_device_scalars:
+            result = result.get()[()]
+        return result
+
+    min = amin
+
+    def absolute(self, a):
+        return self.abs(a)
+
+    # }}}
+
+    # {{{ sorting, searching, and counting
+
+    def where(self, criterion, then, else_):
+        def where_inner(inner_crit, inner_then, inner_else):
+            if isinstance(inner_crit, bool):
+                return inner_then if inner_crit else inner_else
+            return cl_array.if_positive(inner_crit != 0, inner_then, inner_else,
+                    queue=self._array_context.queue)
+
+        return rec_multimap_array_container(where_inner, criterion, then, else_)
+
+    # }}}
+
 
 # }}}
 

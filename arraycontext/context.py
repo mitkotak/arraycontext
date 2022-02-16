@@ -110,6 +110,11 @@ from pytools import memoize_method
 from pytools.tag import Tag
 
 
+DeviceArray = Any
+DeviceScalar = Any
+_ScalarLike = Union[int, float, complex, np.generic]
+
+
 # {{{ ArrayContext
 
 class ArrayContext(ABC):
@@ -133,13 +138,15 @@ class ArrayContext(ABC):
     .. attribute:: np
 
          Provides access to a namespace that serves as a work-alike to
-         :mod:`numpy`.  The actual level of functionality provided is up to the
+         :mod:`numpy`. The actual level of functionality provided is up to the
          individual array context implementation, however the functions and
          objects available under this namespace must not behave differently
          from :mod:`numpy`.
 
          As a baseline, special functions available through :mod:`loopy`
          (e.g. ``sin``, ``exp``) are accessible through this interface.
+         A full list of implemented functionality is given in
+         :ref:`numpy-coverage`.
 
          Callables accessible through this namespace vectorize over object
          arrays, including :class:`arraycontext.ArrayContainer`\ s.
@@ -180,7 +187,7 @@ class ArrayContext(ABC):
         return self.zeros(shape=ary.shape, dtype=ary.dtype)
 
     @abstractmethod
-    def from_numpy(self, array: np.ndarray):
+    def from_numpy(self, array: Union[np.ndarray, _ScalarLike]):
         r"""
         :returns: the :class:`numpy.ndarray` *array* converted to the
             array context's array type. The returned array will be
@@ -307,9 +314,10 @@ class ArrayContext(ABC):
             arg_names = tuple("arg%d" % i for i in range(len(args)))
 
         prg = self._get_einsum_prg(spec, arg_names, tagged)
-        return self.call_loopy(
+        out_ary = self.call_loopy(
             prg, **{arg_names[i]: arg for i, arg in enumerate(args)}
         )["out"]
+        return self.tag(tagged, out_ary)
 
     @abstractmethod
     def clone(self):
