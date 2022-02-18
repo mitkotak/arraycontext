@@ -2,6 +2,7 @@
 .. currentmodule:: arraycontext.impl.pytato.compile
 .. autoclass:: LazilyCompilingFunctionCaller
 .. autoclass:: CompiledFunction
+.. autoclass:: FromArrayContextCompile
 """
 __copyright__ = """
 Copyright (C) 2020-1 University of Illinois Board of Trustees
@@ -14,10 +15,8 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -27,10 +26,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-from arraycontext.container import ArrayContainer
+from arraycontext.container import ArrayContainer, is_array_container_type
 from arraycontext import PytatoPyOpenCLArrayContext
-from arraycontext.container.traversal import (rec_keyed_map_array_container,
-                                              is_array_container)
+from arraycontext.container.traversal import rec_keyed_map_array_container
 
 import abc
 import numpy as np
@@ -40,6 +38,23 @@ from pyrsistent import pmap, PMap
 
 import pyopencl.array as cla
 import pytato as pt
+import itertools
+from pytools.tag import Tag
+
+from pytools import ProcessLogger
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class FromArrayContextCompile(Tag):
+    """
+    Tagged to the entrypoint kernel of every translation unit that is generated
+    by :meth:`~arraycontext.PytatoPyOpenCLArrayContext.compile`.
+    Typically this tag serves as a branch condition in implementing a
+    specialized transform strategy for kernels compiled by
+    :meth:`~arraycontext.PytatoPyOpenCLArrayContext.compile`.
+    """
 
 
 # {{{ helper classes: AbstractInputDescriptor
@@ -73,7 +88,6 @@ def _ary_container_key_stringifier(keys: Tuple[Any, ...]) -> str:
     """
     Helper for :meth:`LazilyCompilingFunctionCaller.__call__`. Stringifies an
     array-container's component's key. Goals of this routine:
-
     * No two different keys should have the same stringification
     * Stringified key must a valid identifier according to :meth:`str.isidentifier`
     * (informal) Shorter identifiers are preferred
@@ -91,7 +105,8 @@ def _ary_container_key_stringifier(keys: Tuple[Any, ...]) -> str:
     return "_".join(_rec_str(key) for key in keys)
 
 
-def _get_arg_id_to_arg_and_arg_id_to_descr(args: Tuple[Any, ...]
+def _get_arg_id_to_arg_and_arg_id_to_descr(args: Tuple[Any, ...],
+                                           kwargs: Mapping[str, Any]
                                            ) -> "Tuple[PMap[Tuple[Any, ...],\
                                                             Any],\
                                                        PMap[Tuple[Any, ...],\
@@ -107,14 +122,15 @@ def _get_arg_id_to_arg_and_arg_id_to_descr(args: Tuple[Any, ...]
     arg_id_to_arg: Dict[Tuple[Any, ...], Any] = {}
     arg_id_to_descr: Dict[Tuple[Any, ...], AbstractInputDescriptor] = {}
 
-    for iarg, arg in enumerate(args):
+    for kw, arg in itertools.chain(enumerate(args),
+                                   kwargs.items()):
         if np.isscalar(arg):
-            arg_id = (iarg,)
+            arg_id = (kw,)
             arg_id_to_arg[arg_id] = arg
             arg_id_to_descr[arg_id] = ScalarInputDescriptor(np.dtype(type(arg)))
-        elif is_array_container(arg):
+        elif is_array_container_type(arg.__class__):
             def id_collector(keys, ary):
-                arg_id = (iarg,) + keys
+                arg_id = (kw,) + keys
                 arg_id_to_arg[arg_id] = ary
                 arg_id_to_descr[arg_id] = LeafArrayDescriptor(np.dtype(ary.dtype),
                                                               ary.shape)
@@ -134,14 +150,14 @@ def _get_arg_id_to_arg_and_arg_id_to_descr(args: Tuple[Any, ...]
     return pmap(arg_id_to_arg), pmap(arg_id_to_descr)
 
 
-def _get_f_placeholder_args(arg, iarg, arg_id_to_name):
+def _get_f_placeholder_args(arg, kw, arg_id_to_name):
     """
     Helper for :class:`LazilyCompilingFunctionCaller.__call__`. Returns the
     placeholder version of an argument to
     :attr:`LazilyCompilingFunctionCaller.f`.
     """
     if np.isscalar(arg):
-        name = arg_id_to_name[(iarg,)]
+        name = arg_id_to_name[(kw,)]
         return pt.make_placeholder(name, (), np.dtype(type(arg)))
     elif isinstance(arg, pt.Array):
         name = arg_id_to_name[(kw,)]
@@ -167,11 +183,8 @@ class LazilyCompilingFunctionCaller:
     :attr:`LazilyCompilingFunctionCaller.f` that can be specialized for the
     input types with which :meth:`LazilyCompilingFunctionCaller.__call__` is
     invoked.
-
     .. attribute:: f
-
         The callable that will be called to obtain :mod:`pytato` DAGs.
-
     .. automethod:: __call__
     """
 
@@ -250,7 +263,6 @@ class LazilyCompilingFunctionCaller:
         """
         Returns the result of :attr:`~LazilyCompilingFunctionCaller.f`'s
         function application on *args*.
-
         Before applying :attr:`~LazilyCompilingFunctionCaller.f`, it is compiled
         to a :mod:`pytato` DAG that would apply
         :attr:`~LazilyCompilingFunctionCaller.f` with *args* in a lazy-sense.
@@ -337,17 +349,12 @@ class CompiledFunction(abc.ABC):
     A callable which captures the :class:`pytato.target.BoundProgram`  resulting
     from calling :attr:`~LazilyCompilingFunctionCaller.f` with a given set of
     input types, and generating :mod:`loopy` IR from it.
-
     .. attribute:: pytato_program
-
     .. attribute:: input_id_to_name_in_program
-
-        A mapping from input id to the placholder name in
+        A mapping from input id to the placeholder name in
         :attr:`CompiledFunction.pytato_program`. Input id is represented as the
         position of :attr:`~LazilyCompilingFunctionCaller.f`'s argument augmented
         with the leaf array's key if the argument is an array container.
-
-
     .. automethod:: __call__
     """
 
@@ -365,15 +372,12 @@ class CompiledFunction(abc.ABC):
 class CompiledFunctionReturningArrayContainer(CompiledFunction):
     """
     .. attribute:: output_id_to_name_in_program
-
         A mapping from output id to the name of
         :class:`pytato.array.NamedArray` in
         :attr:`CompiledFunction.pytato_program`. Output id is represented by
         the key of a leaf array in the array container
         :attr:`CompiledFunction.output_template`.
-
     .. attribute:: output_template
-
        An instance of :class:`arraycontext.ArrayContainer` that is the return
        type of the callable.
     """
@@ -417,7 +421,6 @@ class CompiledFunctionReturningArrayContainer(CompiledFunction):
 class CompiledFunctionReturningArray(CompiledFunction):
     """
     .. attribute:: output_name_in_program
-
         Name of the output array in the program.
     """
     actx: PytatoPyOpenCLArrayContext

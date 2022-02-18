@@ -22,7 +22,6 @@ jobs:
             run: |
                 curl -L -O https://gitlab.tiker.net/inducer/ci-support/raw/main/prepare-and-run-flake8.sh
                 . ./prepare-and-run-flake8.sh "$(basename $GITHUB_REPOSITORY)" test examples
-
     pylint:
         name: Pylint
         runs-on: ubuntu-latest
@@ -33,7 +32,6 @@ jobs:
                 USE_CONDA_BUILD=1
                 curl -L -O https://gitlab.tiker.net/inducer/ci-support/raw/master/prepare-and-run-pylint.sh
                 . ./prepare-and-run-pylint.sh "$(basename $GITHUB_REPOSITORY)" examples/*.py test/test_*.py
-
     mypy:
         name: Mypy
         runs-on: ubuntu-latest
@@ -50,7 +48,6 @@ jobs:
                 build_py_project_in_conda_env
                 python -m pip install mypy
                 ./run-mypy.sh
-
     pytest3_pocl:
         name: Pytest Conda Py3 POCL
         runs-on: ubuntu-latest
@@ -58,11 +55,10 @@ jobs:
         -   uses: actions/checkout@v2
         -   name: "Main Script"
             run: |
-                curl -L -O https://gitlab.tiker.net/inducer/ci-support/raw/main/ci-support.sh
-                . ./ci-support.sh
+                curl -L -O https://tiker.net/ci-support-v0
+                . ./ci-support-v0
                 build_py_project_in_conda_env
                 test_py_project
-
     pytest3_intel_cl:
         name: Pytest Conda Py3 Intel
         runs-on: ubuntu-latest
@@ -72,18 +68,15 @@ jobs:
             run: |
                 curl -L -O https://raw.githubusercontent.com/illinois-scicomp/machine-shop-maintenance/main/install-intel-icd.sh
                 sudo bash ./install-intel-icd.sh
-
                 CONDA_ENVIRONMENT=.test-conda-env-py3.yml
                 echo "- ocl-icd-system" >> "$CONDA_ENVIRONMENT"
                 sed -i "/pocl/ d" "$CONDA_ENVIRONMENT"
                 export PYOPENCL_TEST=intel
                 source /opt/enable-intel-cl.sh
-
                 curl -L -O https://tiker.net/ci-support-v0
                 . ./ci-support-v0
                 build_py_project_in_conda_env
                 test_py_project
-
     examples3:
         name: Examples Conda Py3
         runs-on: ubuntu-latest
@@ -95,7 +88,6 @@ jobs:
                 USE_CONDA_BUILD=1
                 curl -L -O https://gitlab.tiker.net/inducer/ci-support/raw/main/build-py-project-and-run-examples.sh
                 . ./build-py-project-and-run-examples.sh
-
     docs:
         name: Documentation
         runs-on: ubuntu-latest
@@ -107,14 +99,12 @@ jobs:
                 python-version: '3.x'
         -   name: "Main Script"
             run: |
-                curl -L -O https://gitlab.tiker.net/inducer/ci-support/raw/main/ci-support.sh
-                . ci-support.sh
+                curl -L -O https://tiker.net/ci-support-v0
+                . ci-support-v0
                 build_py_project_in_conda_env
                 conda install graphviz
-
                 CI_SUPPORT_SPHINX_VERSION_SPECIFIER=">=4.0"
                 build_docs
-
     downstream_tests:
         strategy:
             matrix:
@@ -130,21 +120,19 @@ jobs:
             env:
                 DOWNSTREAM_PROJECT: ${{ matrix.downstream_project }}
             run: |
+                curl -L -O https://tiker.net/ci-support-v0
+                . ./ci-support-v0
                 if test "$DOWNSTREAM_PROJECT" = "mirgecom"; then
                     git clone "https://github.com/illinois-ceesd/$DOWNSTREAM_PROJECT.git"
                 else
                     git clone "https://github.com/inducer/$DOWNSTREAM_PROJECT.git"
                 fi
-
                 cd "$DOWNSTREAM_PROJECT"
                 echo "*** $DOWNSTREAM_PROJECT version: $(git rev-parse --short HEAD)"
-
                 # Use this version of arraycontext instead of what downstream would install
-                sed -i "/egg=arraycontext/ c git+file://$(readlink -f ..)#egg=arraycontext" requirements.txt
-
+                edit_requirements_txt_for_downstream_in_subdir
                 # Avoid slow or complicated tests in downstream projects
                 export PYTEST_ADDOPTS="-k 'not (slowtest or octave or mpi)'"
-
                 if test "$DOWNSTREAM_PROJECT" = "mirgecom"; then
                     # can't turn off MPI in mirgecom
                     export CONDA_ENVIRONMENT=conda-env.yml
@@ -153,14 +141,9 @@ jobs:
                 else
                     sed -i "/mpi4py/ d" requirements.txt
                 fi
-
-                curl -L -O https://tiker.net/ci-support-v0
-                . ./ci-support-v0
                 build_py_project_in_conda_env
                 test_py_project
-
                 if [[ "$DOWNSTREAM_PROJECT" = "meshmode" ]]; then
                     python ../examples/simple-dg.py --lazy
                 fi
-
 # vim: sw=4

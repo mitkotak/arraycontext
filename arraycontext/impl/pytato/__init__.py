@@ -1,20 +1,14 @@
 """
 .. currentmodule:: arraycontext
-
 A :mod:`pytato`-based array context defers the evaluation of an array until its
 frozen. The execution contexts for the evaluations are specific to an
 :class:`~arraycontext.ArrayContext` type. For ex.
 :class:`~arraycontext.PytatoPyOpenCLArrayContext` uses :mod:`pyopencl` to
 JIT-compile and execute the array expressions.
-
 Following :mod:`pytato`-based array context are provided:
-
 .. autoclass:: PytatoPyOpenCLArrayContext
-
-
 Compiling a python callable
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
 .. automodule:: arraycontext.impl.pytato.compile
 """
 __copyright__ = """
@@ -28,10 +22,8 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -44,25 +36,25 @@ THE SOFTWARE.
 from arraycontext.context import ArrayContext, _ScalarLike
 from arraycontext.container.traversal import rec_map_array_container
 import numpy as np
-from typing import Any, Callable, Union, Sequence
+from typing import Any, Callable, Union, Sequence, TYPE_CHECKING
 from pytools.tag import Tag
+
+if TYPE_CHECKING:
+    import pytato
 
 
 class PytatoPyOpenCLArrayContext(ArrayContext):
     """
     A :class:`ArrayContext` that uses :mod:`pytato` data types to represent
     the arrays targeting OpenCL for offloading operations.
-
     .. attribute:: queue
-
         A :class:`pyopencl.CommandQueue`.
-
     .. attribute:: allocator
-
         A :mod:`pyopencl` memory allocator. Can also be None (default) or False
         to use the default allocator.
-
     .. automethod:: __init__
+    .. automethod:: transform_dag
+    .. automethod:: compile
     """
 
     def __init__(self, queue, allocator=None):
@@ -100,6 +92,9 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
         return pt.make_data_wrapper(cl_array)
 
     def to_numpy(self, array):
+        if np.isscalar(array):
+            return array
+
         cl_array = self.freeze(array)
         return cl_array.get(queue=self.queue)
 
@@ -194,7 +189,7 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
             self._freeze_prg_cache[normalized_expr] = pt_prg
 
         assert len(pt_prg.bound_arguments) == 0
-        evt, (cl_array,) = pt_prg(self.queue, **bound_arguments)
+        evt, out_dict = pt_prg(self.queue, **bound_arguments)
         evt.wait()
 
         return to_tagged_cl_array(
@@ -242,7 +237,6 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
         *dag* (most likely to perform domain-specific optimizations). Every
         :mod:`pytato` DAG that is compiled to a :mod:`pyopencl` kernel is
         passed through this routine.
-
         :arg dag: An instance of :class:`pytato.DictOfNamedArrays`
         :returns: A transformed version of *dag*.
         """
@@ -306,3 +300,11 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
     @property
     def permits_inplace_modification(self):
         return False
+
+    @property
+    def supports_nonscalar_broadcasting(self):
+        return True
+
+    @property
+    def permits_advanced_indexing(self):
+        return True

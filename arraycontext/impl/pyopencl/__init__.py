@@ -15,10 +15,8 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -50,24 +48,17 @@ class PyOpenCLArrayContext(ArrayContext):
     """
     A :class:`ArrayContext` that uses :class:`pyopencl.array.Array` instances
     for its base array class.
-
     .. attribute:: context
-
         A :class:`pyopencl.Context`.
-
     .. attribute:: queue
-
         A :class:`pyopencl.CommandQueue`.
-
     .. attribute:: allocator
-
         A PyOpenCL memory allocator. Can also be `None` (default) or `False` to
         use the default allocator. Please note that running with the default
         allocator allocates and deallocates OpenCL buffers directly. If lots
         of arrays are created (e.g. as results of computation), the associated cost
         may become significant. Using e.g. :class:`pyopencl.tools.MemoryPool`
         as the allocator can help avoid this cost.
-
     .. automethod:: transform_loopy_program
     """
 
@@ -83,20 +74,15 @@ class PyOpenCLArrayContext(ArrayContext):
             from kernel execution are appended to the queue, and Once the
             length of the queue exceeds *wait_event_queue_length*, the
             first event in the queue :meth:`pyopencl.Event.wait`\ ed on.
-
             *wait_event_queue_length* may be set to *False* to disable this feature.
-
             The use of *wait_event_queue_length* helps avoid enqueuing
             large amounts of work (and, potentially, allocating large amounts
             of memory) far ahead of the actual OpenCL execution front,
             by limiting the number of each type (name, really) of kernel
             that may reside unexecuted in the queue at one time.
-
         .. note::
-
             For now, *wait_event_queue_length* should be regarded as an
             experimental feature that may change or disappear at any minute.
-
         :arg force_device_scalars: if *True*, scalar results returned from
             reductions in :attr:`ArrayContext.np` will be kept on the device.
             If *False*, the equivalent of :meth:`~ArrayContext.freeze` and
@@ -176,7 +162,7 @@ class PyOpenCLArrayContext(ArrayContext):
                                   axes=None, tags=frozenset())
 
     def to_numpy(self, array):
-        if not self._force_device_scalars and np.isscalar(array):
+        if np.isscalar(array):
             return array
 
         return array.get(queue=self.queue)
@@ -278,11 +264,17 @@ class PyOpenCLArrayContext(ArrayContext):
 
             if "idof" in all_inames:
                 inner_iname = "idof"
+
         elif "i0" in all_inames:
             outer_iname = "i0"
 
             if "i1" in all_inames:
                 inner_iname = "i1"
+
+        elif not all_inames:
+            # no loops, nothing to transform
+            return t_unit
+
         else:
             raise RuntimeError(
                 "Unable to reason what outer_iname and inner_iname "
@@ -336,6 +328,14 @@ class PyOpenCLArrayContext(ArrayContext):
     @property
     def permits_inplace_modification(self):
         return True
+
+    @property
+    def supports_nonscalar_broadcasting(self):
+        return False
+
+    @property
+    def permits_advanced_indexing(self):
+        return False
 
 # }}}
 
