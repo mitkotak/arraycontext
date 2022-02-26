@@ -1,14 +1,20 @@
 """
 .. currentmodule:: arraycontext
+
 A :mod:`pytato`-based array context defers the evaluation of an array until its
 frozen. The execution contexts for the evaluations are specific to an
 :class:`~arraycontext.ArrayContext` type. For ex.
 :class:`~arraycontext.PytatoPyOpenCLArrayContext` uses :mod:`pyopencl` to
 JIT-compile and execute the array expressions.
+
 Following :mod:`pytato`-based array context are provided:
+
 .. autoclass:: PytatoPyOpenCLArrayContext
+
+
 Compiling a python callable
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. automodule:: arraycontext.impl.pytato.compile
 """
 __copyright__ = """
@@ -22,8 +28,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -47,13 +55,20 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
     """
     A :class:`ArrayContext` that uses :mod:`pytato` data types to represent
     the arrays targeting OpenCL for offloading operations.
+    
     .. attribute:: queue
+    
         A :class:`pyopencl.CommandQueue`.
+    
     .. attribute:: allocator
+    
         A :mod:`pyopencl` memory allocator. Can also be None (default) or False
         to use the default allocator.
+    
     .. automethod:: __init__
+    
     .. automethod:: transform_dag
+    
     .. automethod:: compile
     """
 

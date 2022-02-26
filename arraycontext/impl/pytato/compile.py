@@ -15,8 +15,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -51,6 +53,7 @@ class FromArrayContextCompile(Tag):
     """
     Tagged to the entrypoint kernel of every translation unit that is generated
     by :meth:`~arraycontext.PytatoPyOpenCLArrayContext.compile`.
+    
     Typically this tag serves as a branch condition in implementing a
     specialized transform strategy for kernels compiled by
     :meth:`~arraycontext.PytatoPyOpenCLArrayContext.compile`.
@@ -88,6 +91,7 @@ def _ary_container_key_stringifier(keys: Tuple[Any, ...]) -> str:
     """
     Helper for :meth:`LazilyCompilingFunctionCaller.__call__`. Stringifies an
     array-container's component's key. Goals of this routine:
+    
     * No two different keys should have the same stringification
     * Stringified key must a valid identifier according to :meth:`str.isidentifier`
     * (informal) Shorter identifiers are preferred
@@ -183,8 +187,11 @@ class LazilyCompilingFunctionCaller:
     :attr:`LazilyCompilingFunctionCaller.f` that can be specialized for the
     input types with which :meth:`LazilyCompilingFunctionCaller.__call__` is
     invoked.
+    
     .. attribute:: f
+    
         The callable that will be called to obtain :mod:`pytato` DAGs.
+    
     .. automethod:: __call__
     """
 
@@ -263,6 +270,7 @@ class LazilyCompilingFunctionCaller:
         """
         Returns the result of :attr:`~LazilyCompilingFunctionCaller.f`'s
         function application on *args*.
+        
         Before applying :attr:`~LazilyCompilingFunctionCaller.f`, it is compiled
         to a :mod:`pytato` DAG that would apply
         :attr:`~LazilyCompilingFunctionCaller.f` with *args* in a lazy-sense.
@@ -349,12 +357,17 @@ class CompiledFunction(abc.ABC):
     A callable which captures the :class:`pytato.target.BoundProgram`  resulting
     from calling :attr:`~LazilyCompilingFunctionCaller.f` with a given set of
     input types, and generating :mod:`loopy` IR from it.
+    
     .. attribute:: pytato_program
+    
     .. attribute:: input_id_to_name_in_program
+    
         A mapping from input id to the placeholder name in
         :attr:`CompiledFunction.pytato_program`. Input id is represented as the
         position of :attr:`~LazilyCompilingFunctionCaller.f`'s argument augmented
         with the leaf array's key if the argument is an array container.
+    
+    
     .. automethod:: __call__
     """
 
@@ -372,12 +385,15 @@ class CompiledFunction(abc.ABC):
 class CompiledFunctionReturningArrayContainer(CompiledFunction):
     """
     .. attribute:: output_id_to_name_in_program
+        
         A mapping from output id to the name of
         :class:`pytato.array.NamedArray` in
         :attr:`CompiledFunction.pytato_program`. Output id is represented by
         the key of a leaf array in the array container
         :attr:`CompiledFunction.output_template`.
+    
     .. attribute:: output_template
+       
        An instance of :class:`arraycontext.ArrayContainer` that is the return
        type of the callable.
     """
@@ -421,6 +437,7 @@ class CompiledFunctionReturningArrayContainer(CompiledFunction):
 class CompiledFunctionReturningArray(CompiledFunction):
     """
     .. attribute:: output_name_in_program
+    
         Name of the output array in the program.
     """
     actx: PytatoPyOpenCLArrayContext
