@@ -80,7 +80,6 @@ __all__ = (
 
         "CommonSubexpressionTag",
         "ElementwiseMapKernelTag",
-        
         "ArrayContainer", "NotAnArrayContainerError",
         "is_array_container", "is_array_container_type",
         "get_container_context", "get_container_context_recursively",

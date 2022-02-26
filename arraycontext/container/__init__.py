@@ -2,28 +2,40 @@
 
 """
 .. currentmodule:: arraycontext
+
 .. class:: ArrayT
     :canonical: arraycontext.container.ArrayT
+
     :class:`~typing.TypeVar` for arrays.
+
 .. class:: ContainerT
     :canonical: arraycontext.container.ContainerT
+
     :class:`~typing.TypeVar` for array container-like objects.
+
 .. class:: ArrayOrContainerT
     :canonical: arraycontext.container.ArrayOrContainerT
+
     :class:`~typing.TypeVar` for arrays or array container-like objects.
+
 .. autoclass:: ArrayContainer
+
 .. autoexception:: NotAnArrayContainerError
+
 Serialization/deserialization
 -----------------------------
 .. autofunction:: is_array_container_type
 .. autofunction:: serialize_container
 .. autofunction:: deserialize_container
+
 Context retrieval
 -----------------
 .. autofunction:: get_container_context
 .. autofunction:: get_container_context_recursively
+
 :class:`~pymbolic.geometric_algebra.MultiVector` support
 ---------------------------------------------------------
+
 .. autofunction:: register_multivector_as_array_container
 """
 
@@ -39,8 +51,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -69,28 +83,35 @@ class ArrayContainer:
     r"""
     A generic container for the array type supported by the
     :class:`ArrayContext`.
+
     The functionality required for the container to operated is supplied via
     :func:`functools.singledispatch`. Implementations of the following functions need
     to be registered for a type serving as an :class:`ArrayContainer`:
+
     * :func:`serialize_container` for serialization, which gives the components
       of the array.
     * :func:`deserialize_container` for deserialization, which constructs a
       container from a set of components.
     * :func:`get_container_context` retrieves the :class:`ArrayContext` from
       a container, if it has one.
+    
     This allows enumeration of the component arrays in a container and the
     construction of modified containers from an iterable of those component arrays.
+
     Packages may register their own types as array containers. They must not
     register other types (e.g. :class:`list`) as array containers.
     The type :class:`numpy.ndarray` is considered an array container, but
     only arrays with dtype *object* may be used as such. (This is so
     because object arrays cannot be distinguished from non-object arrays
     via their type.)
+
     The container and its serialization interface has goals and uses
     approaches similar to JAX's
     `PyTrees <https://jax.readthedocs.io/en/latest/pytrees.html>`__,
     however its implementation differs a bit.
+    
     .. note::
+
         This class is used in type annotation. Inheriting from it confers no
         special meaning or behavior.
     """
@@ -103,15 +124,18 @@ class NotAnArrayContainerError(TypeError):
 @singledispatch
 def serialize_container(ary: Any) -> Iterable[Tuple[Any, Any]]:
     r"""Serialize the array container into an iterable over its components.
+
     The order of the components and their identifiers are entirely under
     the control of the container class. However, the order is required to be
     deterministic, i.e. two calls to :func:`serialize_container` on
     array containers of the same types with the same number of
     sub-arrays must result in an iterable with the keys in the same
     order.
+
     If *ary* is mutable, the serialization function is not required to ensure
     that the serialization result reflects the array state at the time of the
     call to :func:`serialize_container`.
+
     :returns: an :class:`Iterable` of 2-tuples where the first
         entry is an identifier for the component and the second entry
         is an array-like component of the :class:`ArrayContainer`.
@@ -126,6 +150,7 @@ def serialize_container(ary: Any) -> Iterable[Tuple[Any, Any]]:
 @singledispatch
 def deserialize_container(template: Any, iterable: Iterable[Tuple[Any, Any]]) -> Any:
     """Deserialize an iterable into an array container.
+    
     :param template: an instance of an existing object that
         can be used to aid in the deserialization. For a similar choice
         see :attr:`~numpy.class.__array_finalize__`.
