@@ -18,8 +18,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -138,6 +140,7 @@ def with_container_arithmetic(
         rel_comparison: Optional[bool] = None) -> Callable[[type], type]:
     """A class decorator that implements built-in operators for array containers
     by propagating the operations to the elements of the container.
+
     :arg bcast_number: If *True*, numbers broadcast over the container
         (with the container as the 'outer' structure).
     :arg _bcast_actx_array_type: If *True*, instances of base array types of the
@@ -170,20 +173,26 @@ def with_container_arithmetic(
         is *True*, an additional check is performed in binary operators
         to ensure that both containers use the same array context.
         Consider this argument an unstable interface. It may disappear at any moment.
+
     Each operator class also includes the "reverse" operators if applicable.
+
     .. note::
+
         To generate the code implementing the operators, this function relies on
         class methods ``_deserialize_init_arrays_code`` and
         ``_serialize_init_arrays_code``. This interface should be considered
         undocumented and subject to change, however if you are curious, you may look
         at its implementation in :class:`meshmode.dof_array.DOFArray`. For a simple
         structure type, the implementation might look like this::
+
             @classmethod
             def _serialize_init_arrays_code(cls, instance_name):
                 return {"u": f"{instance_name}.u", "v": f"{instance_name}.v"}
+
             @classmethod
             def _deserialize_init_arrays_code(cls, tmpl_instance_name, args):
                 return f"u={args['u']}, v={args['v']}"
+
     :func:`dataclass_array_container` automatically generates an appropriate
     implementation of these methods, so :func:`with_container_arithmetic`
     should nest "outside" :func:dataclass_array_container`.
@@ -265,6 +274,7 @@ def with_container_arithmetic(
             from numbers import Number
             import numpy as np
             from arraycontext import ArrayContainer
+
             def _raise_if_actx_none(actx):
                 if actx is None:
                     raise ValueError("array containers with frozen arrays "
@@ -425,6 +435,7 @@ def with_container_arithmetic(
                 gen(f"""
                     def {fname}(arg2, arg1):
                         # assert other.__cls__ is not cls
+
                         if {bool(outer_bcast_type_names)}:  # optimized away
                             if isinstance(arg1,
                                           {tup_str(outer_bcast_type_names
@@ -436,6 +447,7 @@ def with_container_arithmetic(
                                 result[i] = {op_str.format("arg1[i]", "arg2")}
                             return result
                         return NotImplemented
+
                     cls.__r{dunder_name}__ = {fname}""")
                 gen("")
 
