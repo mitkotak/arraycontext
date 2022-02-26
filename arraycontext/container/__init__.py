@@ -94,7 +94,7 @@ class ArrayContainer:
       container from a set of components.
     * :func:`get_container_context` retrieves the :class:`ArrayContext` from
       a container, if it has one.
-    
+
     This allows enumeration of the component arrays in a container and the
     construction of modified containers from an iterable of those component arrays.
 
@@ -109,7 +109,7 @@ class ArrayContainer:
     approaches similar to JAX's
     `PyTrees <https://jax.readthedocs.io/en/latest/pytrees.html>`__,
     however its implementation differs a bit.
-    
+
     .. note::
 
         This class is used in type annotation. Inheriting from it confers no
@@ -150,7 +150,7 @@ def serialize_container(ary: Any) -> Iterable[Tuple[Any, Any]]:
 @singledispatch
 def deserialize_container(template: Any, iterable: Iterable[Tuple[Any, Any]]) -> Any:
     """Deserialize an iterable into an array container.
-    
+
     :param template: an instance of an existing object that
         can be used to aid in the deserialization. For a similar choice
         see :attr:`~numpy.class.__array_finalize__`.
@@ -165,7 +165,9 @@ def is_array_container_type(cls: type) -> bool:
     """
     :returns: *True* if the type *cls* has a registered implementation of
         :func:`serialize_container`, or if it is an :class:`ArrayContainer`.
+
     .. warning::
+
         Not all instances of a type that this function labels an array container
         must automatically be array containers. For example, while this
         function will say that :class:`numpy.ndarray` is an array container
@@ -198,6 +200,7 @@ def is_array_container(ary: Any) -> bool:
 @singledispatch
 def get_container_context(ary: ArrayContainer) -> Optional[ArrayContext]:
     """Retrieves the :class:`ArrayContext` from the container, if any.
+
     This function is not recursive, so it will only search at the root level
     of the container. For the recursive version, see
     :func:`get_container_context_recursively`.
@@ -249,6 +252,7 @@ def _deserialize_ndarray_container(
 def get_container_context_recursively(ary: Any) -> Optional[ArrayContext]:
     """Walks the :class:`ArrayContainer` hierarchy to find an
     :class:`ArrayContext` associated with it.
+
     If different components that have different array contexts are found at
     any level, an assertion error is raised.
     """
