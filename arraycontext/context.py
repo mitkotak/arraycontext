@@ -1,41 +1,54 @@
 """
 .. _freeze-thaw:
+
 Freezing and thawing
 --------------------
+
 One of the central concepts introduced by the array context formalism is
 the notion of :meth:`~arraycontext.ArrayContext.freeze` and
 :meth:`~arraycontext.ArrayContext.thaw`. Each array handled by the array context
 is either "thawed" or "frozen". Unlike the real-world concept of freezing and
 thawing, these operations leave the original array alone; instead, a semantically
 separate array in the desired state is returned.
+
 *   "Thawed" arrays are associated with an array context. They use that context
     to carry out operations (arithmetic, function calls).
+
 *   "Frozen" arrays are static data. They are not associated with an array context,
     and no operations can be performed on them.
+
 Freezing and thawing may be used to move arrays from one array context to another,
 as long as both array contexts use identical in-memory data representation.
 Otherwise, a common format must be agreed upon, for example using
 :mod:`numpy` through :meth:`~arraycontext.ArrayContext.to_numpy` and
 :meth:`~arraycontext.ArrayContext.from_numpy`.
+
 .. _freeze-thaw-guidelines:
+
 Usage guidelines
 ^^^^^^^^^^^^^^^^
 Here are some rules of thumb to use when dealing with thawing and freezing:
+
 -   Any array that is stored for a long time needs to be frozen.
     "Memoized" data (cf. :func:`pytools.memoize` and friends) is a good example
     of long-lived data that should be frozen.
+
 -   Within a function, if the user did not supply an array context,
     then any data returned to the user should be frozen.
+
 -   Note that array contexts need not necessarily be passed as a separate
     argument. Passing thawed data as an argument to a function suffices
     to supply an array context. The array context can be extracted from
     a thawed argument using, e.g., :func:`~arraycontext.get_container_context`
     or :func:`~arraycontext.get_container_context_recursively`.
+
 What does this mean concretely?
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Freezing and thawing are abstract names for concrete operations. It may be helpful
 to understand what these operations mean in the concrete case of various
 actual array contexts:
+
 -   Each :class:`~arraycontext.PyOpenCLArrayContext` is associated with a
     :class:`pyopencl.CommandQueue`. In order to operate on array data,
     such a command queue is necessary; it is the main means of synchronization
@@ -48,6 +61,7 @@ actual array contexts:
     available. (Since bugs of this nature would be very difficult to
     find, :class:`pyopencl.array.Array` and
     :class:`~meshmode.dof_array.DOFArray` will not allow them.)
+
 -   For the lazily-evaluating array context based on :mod:`pytato`,
     "thawing" corresponds to the creation of a symbolic "handle"
     (specifically, a :class:`pytato.array.DataWrapper`) representing
@@ -55,17 +69,24 @@ actual array contexts:
     corresponds to triggering (code generation and) evaluation of
     an array expression that has been built up by the user
     (using, e.g. :func:`pytato.generate_loopy`).
+
 The interface of an array context
 ---------------------------------
+
 .. currentmodule:: arraycontext
+
 .. class:: DeviceArray
+
     A (type alias for an) array type supported by the :class:`ArrayContext`
     meant to aid in typing annotations. For a explicit list of supported types
     see :attr:`ArrayContext.array_types`.
+
 .. class:: DeviceScalar
+
     A (type alias for a) scalar type supported by the :class:`ArrayContext`
     meant to aid in typing annotations, e.g. for reductions. In :mod:`numpy`
     terminology, this is just an array with a shape of ``()``.
+
 .. autoclass:: ArrayContext
 """
 
@@ -81,8 +102,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -110,10 +133,13 @@ _ScalarLike = Union[int, float, complex, np.generic]
 class ArrayContext(ABC):
     r"""
     :canonical: arraycontext.ArrayContext
+
     An interface that allows software implementing a numerical algorithm
     (such as :class:`~meshmode.discretization.Discretization`) to create and interact
     with arrays without knowing their types.
+
     .. versionadded:: 2020.2
+
     .. automethod:: empty
     .. automethod:: zeros
     .. automethod:: empty_like
@@ -123,20 +149,26 @@ class ArrayContext(ABC):
     .. automethod:: call_loopy
     .. automethod:: einsum
     .. attribute:: np
+
          Provides access to a namespace that serves as a work-alike to
          :mod:`numpy`. The actual level of functionality provided is up to the
          individual array context implementation, however the functions and
          objects available under this namespace must not behave differently
          from :mod:`numpy`.
+
          As a baseline, special functions available through :mod:`loopy`
          (e.g. ``sin``, ``exp``) are accessible through this interface.
          A full list of implemented functionality is given in
          :ref:`numpy-coverage`.
+
          Callables accessible through this namespace vectorize over object
          arrays, including :class:`arraycontext.ArrayContainer`\ s.
+
     .. attribute:: array_types
+
         A :class:`tuple` of types that are the valid base array classes
         the context can operate on.
+
     .. automethod:: freeze
     .. automethod:: thaw
     .. automethod:: tag
@@ -188,9 +220,11 @@ class ArrayContext(ABC):
     def call_loopy(self, program, **kwargs):
         """Execute the :mod:`loopy` program *program* on the arguments
         *kwargs*.
+
         *program* is a :class:`loopy.LoopKernel` or :class:`loopy.TranslationUnit`.
         It is expected to not yet be transformed for execution speed.
         It must have :attr:`loopy.Options.return_dict` set.
+
         :return: a :class:`dict` of outputs from the program, each an
             array understood by the context.
         """
@@ -203,9 +237,11 @@ class ArrayContext(ABC):
         :class:`~pyopencl.array.Array`, this might mean stripping the array
         of an associated command queue, whereas in a lazily-evaluated context,
         it might mean that the array is evaluated and stored.
+
         Freezing makes the array independent of this :class:`ArrayContext`;
         it is permitted to :meth:`thaw` it in a different one, as long as that
         context understands the array format.
+
         See also :func:`arraycontext.freeze`.
         """
 
@@ -218,7 +254,9 @@ class ArrayContext(ABC):
         equipped with a command queue, whereas in a lazily-evaluated context,
         it might mean that the returned array is a symbol bound to
         the data in *array*.
+
         The returned array may not be used with other contexts while thawed.
+
         See also :func:`arraycontext.thaw`.
         """
 
@@ -227,6 +265,7 @@ class ArrayContext(ABC):
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* with the *tags* applied. *array*
         itself is not modified.
+
         .. versionadded:: 2021.2
         """
 
@@ -235,6 +274,7 @@ class ArrayContext(ABC):
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* in which axis number *iaxis* has
         the *tags* applied. *array* itself is not modified.
+
         .. versionadded:: 2021.2
         """
 
@@ -268,6 +308,7 @@ class ArrayContext(ABC):
     def einsum(self, spec, *args, arg_names=None, tagged=()):
         """Computes the result of Einstein summation following the
         convention in :func:`numpy.einsum`.
+
         :arg spec: a string denoting the subscripts for
             summation as a comma-separated list of subscript labels.
             This follows the usual :func:`numpy.einsum` convention.
@@ -280,6 +321,7 @@ class ArrayContext(ABC):
             generated.
         :arg tagged: an optional sequence of :class:`pytools.tag.Tag`
             objects specifying the tags to be applied to the operation.
+
         :return: the output of the einsum :mod:`loopy` program
         """
         if arg_names is None:
@@ -296,7 +338,9 @@ class ArrayContext(ABC):
         """If possible, return a version of *self* that is semantically
         equivalent (i.e. implements all array operations in the same way)
         but is a separate object. May return *self* if that is not possible.
+
         .. note::
+
             The main objective of this semi-documented method is to help
             flag errors more clearly when array contexts are mixed that
             should not be. For example, at the time of this writing,
@@ -312,14 +356,17 @@ class ArrayContext(ABC):
         """Compiles *f* for repeated use on this array context. *f* is expected
         to be a `pure function <https://en.wikipedia.org/wiki/Pure_function>`__
         performing an array computation.
+
         Control flow statements (``if``, ``while``) that might take different
         paths depending on the data lead to undefined behavior and are illegal.
         Any data-dependent control flow must be expressed via array functions,
         such as ``actx.np.where``.
+
         *f* may be called on placeholder data, to obtain a representation
         of the computation performed, or it may be called as part of the actual
         computation, on actual data. If *f* is called on placeholder data,
         it may be called only once (or a few times).
+
         :arg f: the function executing the computation.
         :return: a function with the same signature as *f*.
         """
