@@ -17,8 +17,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -39,6 +41,7 @@ def dataclass_array_container(cls: type) -> type:
     :class:`ArrayContainer` by registering appropriate implementations of
     :func:`serialize_container` and :func:`deserialize_container`.
     *cls* must be a :func:`~dataclasses.dataclass`.
+
     Attributes that are not array containers are allowed. In order to decide
     whether an attribute is an array container, the declared attribute type
     is checked by the criteria from :func:`is_array_container_type`.
@@ -96,23 +99,29 @@ def dataclass_array_container(cls: type) -> type:
     serialize_code = remove_common_indentation(f"""
         from typing import Any, Iterable, Tuple
         from arraycontext import serialize_container, deserialize_container
+
         @serialize_container.register(cls)
         def _serialize_{lower_cls_name}(ary: cls) -> Iterable[Tuple[Any, Any]]:
             return ({serialize_expr},)
+
         @deserialize_container.register(cls)
         def _deserialize_{lower_cls_name}(
                 template: cls, iterable: Iterable[Tuple[Any, Any]]) -> cls:
             return cls(**dict(iterable), {template_kwargs})
+
         # support for with_container_arithmetic
+
         def _serialize_init_arrays_code_{lower_cls_name}(cls, instance_name):
             return {{
                 {serialize_init_code}
                 }}
         cls._serialize_init_arrays_code = classmethod(
             _serialize_init_arrays_code_{lower_cls_name})
+
         def _deserialize_init_arrays_code_{lower_cls_name}(
                 cls, template_instance_name, args):
             return f"{deserialize_init_code}"
+
         cls._deserialize_init_arrays_code = classmethod(
             _deserialize_init_arrays_code_{lower_cls_name})
         """)
