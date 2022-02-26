@@ -2,30 +2,37 @@
 
 """
 .. currentmodule:: arraycontext
+
 .. autofunction:: map_array_container
 .. autofunction:: multimap_array_container
 .. autofunction:: rec_map_array_container
 .. autofunction:: rec_multimap_array_container
+
 .. autofunction:: map_reduce_array_container
 .. autofunction:: multimap_reduce_array_container
 .. autofunction:: rec_map_reduce_array_container
 .. autofunction:: rec_multimap_reduce_array_container
+
 Traversing decorators
 ~~~~~~~~~~~~~~~~~~~~~
 .. autofunction:: mapped_over_array_containers
 .. autofunction:: multimapped_over_array_containers
+
 Freezing and thawing
 ~~~~~~~~~~~~~~~~~~~~
 .. autofunction:: freeze
 .. autofunction:: thaw
+
 Flattening and unflattening
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 .. autofunction:: flatten
 .. autofunction:: unflatten
+
 Numpy conversion
 ~~~~~~~~~~~~~~~~
 .. autofunction:: from_numpy
 .. autofunction:: to_numpy
+
 Algebraic operations
 ~~~~~~~~~~~~~~~~~~~~
 .. autofunction:: outer
@@ -42,8 +49,10 @@ in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
+
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
+
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -72,6 +81,7 @@ def _map_array_container_impl(
         leaf_cls: Optional[type] = None,
         recursive: bool = False) -> ArrayOrContainerT:
     """Helper for :func:`rec_map_array_container`.
+
     :param leaf_cls: class on which we call *f* directly. This is mostly
         useful in the recursive setting, where it can stop the recursion on
         specific container classes. By default, the recursion is stopped when
@@ -101,6 +111,7 @@ def _multimap_array_container_impl(
         leaf_cls: Optional[type] = None,
         recursive: bool = False) -> ArrayOrContainerT:
     """Helper for :func:`rec_multimap_array_container`.
+
     :param leaf_cls: class on which we call *f* directly. This is mostly
         useful in the recursive setting, where it can stop the recursion on
         specific container classes. By default, the recursion is stopped when
@@ -209,9 +220,12 @@ def map_array_container(
         f: Callable[[Any], Any],
         ary: ArrayOrContainerT) -> ArrayOrContainerT:
     r"""Applies *f* to all components of an :class:`ArrayContainer`.
+
     Works similarly to :func:`~pytools.obj_array.obj_array_vectorize`, but
     on arbitrary containers.
+
     For a recursive version, see :func:`rec_map_array_container`.
+
     :param ary: a (potentially nested) structure of :class:`ArrayContainer`\ s,
         or an instance of a base array type.
     """
@@ -227,10 +241,13 @@ def map_array_container(
 
 def multimap_array_container(f: Callable[..., Any], *args: Any) -> Any:
     r"""Applies *f* to the components of multiple :class:`ArrayContainer`\ s.
+
     Works similarly to :func:`~pytools.obj_array.obj_array_vectorize_n_args`,
     but on arbitrary containers. The containers must all have the same type,
     which will also be the return type.
+
     For a recursive version, see :func:`rec_multimap_array_container`.
+
     :param args: all :class:`ArrayContainer` arguments must be of the same
         type and with the same structure (same number of components, etc.).
     """
@@ -242,7 +259,9 @@ def rec_map_array_container(
         ary: ArrayOrContainerT,
         leaf_class: Optional[type] = None) -> ArrayOrContainerT:
     r"""Applies *f* recursively to an :class:`ArrayContainer`.
+
     For a non-recursive version see :func:`map_array_container`.
+
     :param ary: a (potentially nested) structure of :class:`ArrayContainer`\ s,
         or an instance of a base array type.
     """
@@ -273,7 +292,9 @@ def rec_multimap_array_container(
         *args: Any,
         leaf_class: Optional[type] = None) -> Any:
     r"""Applies *f* recursively to multiple :class:`ArrayContainer`\ s.
+
     For a non-recursive version see :func:`multimap_array_container`.
+
     :param args: all :class:`ArrayContainer` arguments must be of the same
         type and with the same structure (same number of components, etc.).
     """
@@ -311,9 +332,12 @@ def keyed_map_array_container(
             ArrayOrContainerT],
         ary: ArrayOrContainerT) -> ArrayOrContainerT:
     r"""Applies *f* to all components of an :class:`ArrayContainer`.
+
     Works similarly to :func:`map_array_container`, but *f* also takes an
     identifier of the array in the container *ary*.
+
     For a recursive version, see :func:`rec_keyed_map_array_container`.
+
     :param ary: a (potentially nested) structure of :class:`ArrayContainer`\ s,
         or an instance of a base array type.
     """
@@ -361,6 +385,7 @@ def map_reduce_array_container(
         map_func: Callable[[Any], Any],
         ary: ArrayOrContainerT) -> "DeviceArray":
     """Perform a map-reduce over array containers.
+
     :param reduce_func: callable used to reduce over the components of *ary*
         if *ary* is an :class:`~arraycontext.ArrayContainer`. The callable
         should be associative, as for :func:`rec_map_reduce_array_container`.
@@ -383,6 +408,7 @@ def multimap_reduce_array_container(
         map_func: Callable[..., Any],
         *args: Any) -> "DeviceArray":
     r"""Perform a map-reduce over multiple array containers.
+
     :param reduce_func: callable used to reduce over the components of any
         :class:`~arraycontext.ArrayContainer`\ s in *\*args*. The callable
         should be associative, as for :func:`rec_map_reduce_array_container`.
@@ -406,13 +432,16 @@ def rec_map_reduce_array_container(
         ary: ArrayOrContainerT,
         leaf_class: Optional[type] = None) -> "DeviceArray":
     """Perform a map-reduce over array containers recursively.
+
     :param reduce_func: callable used to reduce over the components of *ary*
         (and those of its sub-containers) if *ary* is a
         :class:`~arraycontext.ArrayContainer`. Must be associative.
     :param map_func: callable used to map a single array of type
         :class:`arraycontext.ArrayContext.array_types`. Returns an array of the
         same type or a scalar.
+
     .. note::
+
         The traversal order is unspecified. *reduce_func* must be associative in
         order to guarantee a sensible result. This is because *reduce_func* may be
         called on subsets of the component arrays, and then again (potentially
@@ -420,6 +449,7 @@ def rec_map_reduce_array_container(
         of two sub-containers, *subcontainer0* and *subcontainer1*, that each
         contain two component arrays, *array0* and *array1*. The same result must be
         computed whether traversing recursively::
+
             reduce_func([
                 reduce_func([
                     map_func(subcontainer0.array0),
@@ -427,12 +457,15 @@ def rec_map_reduce_array_container(
                 reduce_func([
                     map_func(subcontainer1.array0),
                     map_func(subcontainer1.array1)])])
+
         reducing all of the arrays at once::
+
             reduce_func([
                 map_func(subcontainer0.array0),
                 map_func(subcontainer0.array1),
                 map_func(subcontainer1.array0),
                 map_func(subcontainer1.array1)])
+
         or any other such traversal.
     """
     def rec(_ary: ArrayOrContainerT) -> ArrayOrContainerT:
@@ -457,13 +490,16 @@ def rec_multimap_reduce_array_container(
         *args: Any,
         leaf_class: Optional[type] = None) -> "DeviceArray":
     r"""Perform a map-reduce over multiple array containers recursively.
+
     :param reduce_func: callable used to reduce over the components of any
         :class:`~arraycontext.ArrayContainer`\ s in *\*args* (and those of their
         sub-containers). Must be associative.
     :param map_func: callable used to map a single array of type
         :class:`arraycontext.ArrayContext.array_types`. Returns an array of the
         same type or a scalar.
+
     .. note::
+
         The traversal order is unspecified. *reduce_func* must be associative in
         order to guarantee a sensible result. See
         :func:`rec_map_reduce_array_container` for additional details.
@@ -488,9 +524,12 @@ def freeze(
         actx: Optional[ArrayContext] = None) -> ArrayOrContainerT:
     r"""Freezes recursively by going through all components of the
     :class:`ArrayContainer` *ary*.
+
     :param ary: a :meth:`~ArrayContext.thaw`\ ed :class:`ArrayContainer`.
+
     Array container types may use :func:`functools.singledispatch` ``.register`` to
     register additional implementations.
+
     See :meth:`ArrayContext.thaw`.
     """
     try:
@@ -513,13 +552,19 @@ def freeze(
 def thaw(ary: ArrayOrContainerT, actx: ArrayContext) -> ArrayOrContainerT:
     r"""Thaws recursively by going through all components of the
     :class:`ArrayContainer` *ary*.
+
     :param ary: a :meth:`~ArrayContext.freeze`\ ed :class:`ArrayContainer`.
+
     Array container types may use :func:`functools.singledispatch` ``.register``
     to register additional implementations.
+
     See :meth:`ArrayContext.thaw`.
+
     Serves as the registration point (using :func:`~functools.singledispatch`
     ``.register`` to register additional implementations for :func:`thaw`.
+
     .. note::
+
         This function has the reverse argument order from the original function
         in :mod:`meshmode`. This was necessary because
         :func:`~functools.singledispatch` only dispatches on the first argument.
@@ -544,12 +589,15 @@ def flatten(
         ) -> Any:
     """Convert all arrays in the :class:`~arraycontext.ArrayContainer`
     into single flat array of a type :attr:`arraycontext.ArrayContext.array_types`.
+
     The operation requires :attr:`arraycontext.ArrayContext.np` to have
     ``ravel`` and ``concatenate`` methods implemented. The order in which the
     individual leaf arrays appear in the final array is dependent on the order
     given by :func:`~arraycontext.serialize_container`.
+
     If *leaf_class* is given, then :func:`unflatten` will not be able to recover
     the original *ary*.
+
     :arg leaf_class: an :class:`~arraycontext.ArrayContainer` class on which
         the recursion is stopped (subclasses are not considered). If given, only
         the entries of this type are flattened and the rest of the tree
@@ -630,8 +678,10 @@ def unflatten(
         strict: bool = True) -> ArrayOrContainerT:
     """Unflatten an array *ary* produced by :func:`flatten` back into an
     :class:`~arraycontext.ArrayContainer`.
+
     The order and sizes of each slice into *ary* are determined by the
     array container *template*.
+
     :arg ary: a flat one-dimensional array with a size that matches the
         number of entries in *template*.
     :arg strict: if *True* additional :class:`~numpy.dtype` and stride
@@ -731,6 +781,7 @@ def from_numpy(
         actx: ArrayContext) -> ArrayOrContainerT:
     """Convert all :mod:`numpy` arrays in the :class:`~arraycontext.ArrayContainer`
     to the base array type of :class:`~arraycontext.ArrayContext`.
+
     The conversion is done using :meth:`arraycontext.ArrayContext.from_numpy`.
     """
     def _from_numpy_with_check(subary: Union[np.ndarray, _ScalarLike]) \
@@ -746,6 +797,7 @@ def from_numpy(
 def to_numpy(ary: ArrayOrContainerT, actx: ArrayContext) -> Any:
     """Convert all arrays in the :class:`~arraycontext.ArrayContainer` to
     :mod:`numpy` using the provided :class:`~arraycontext.ArrayContext` *actx*.
+
     The conversion is done using :meth:`arraycontext.ArrayContext.to_numpy`.
     """
     def _to_numpy_with_check(subary: Any) -> Any:
@@ -767,11 +819,13 @@ def outer(a: Any, b: Any) -> Any:
     """
     Compute the outer product of *a* and *b* while allowing either of them
     to be an :class:`ArrayContainer`.
+
     Tweaks the behavior of :func:`numpy.outer` to return a lower-dimensional
     object if either/both of *a* and *b* are scalars (whereas :func:`numpy.outer`
     always returns a matrix). Here the definition of "scalar" includes
     all non-array-container types and any scalar-like array container types
     (including non-object numpy arrays).
+
     If *a* and *b* are both array containers, the result will have the same type
     as *a*. If both are array containers and neither is an object array, they must
     have the same type.
