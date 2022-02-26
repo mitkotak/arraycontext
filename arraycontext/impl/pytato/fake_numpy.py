@@ -48,9 +48,9 @@ class PytatoFakeNumpyLinalgNamespace(BaseFakeNumpyLinalgNamespace):
 class PytatoFakeNumpyNamespace(LoopyBasedFakeNumpyNamespace):
     """
     A :mod:`numpy` mimic for :class:`PytatoPyOpenCLArrayContext`.
-    
+
     .. note::
-    
+
         :mod:`pytato` does not define any memory layout for its arrays. See
         :ref:`Pytato docs <pytato:memory-layout>` for more on this.
     """

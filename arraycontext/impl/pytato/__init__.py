@@ -55,20 +55,20 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
     """
     A :class:`ArrayContext` that uses :mod:`pytato` data types to represent
     the arrays targeting OpenCL for offloading operations.
-    
+
     .. attribute:: queue
     
         A :class:`pyopencl.CommandQueue`.
-    
+
     .. attribute:: allocator
-    
+
         A :mod:`pyopencl` memory allocator. Can also be None (default) or False
         to use the default allocator.
-    
+
     .. automethod:: __init__
-    
+
     .. automethod:: transform_dag
-    
+
     .. automethod:: compile
     """
 
@@ -252,6 +252,7 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
         *dag* (most likely to perform domain-specific optimizations). Every
         :mod:`pytato` DAG that is compiled to a :mod:`pyopencl` kernel is
         passed through this routine.
+
         :arg dag: An instance of :class:`pytato.DictOfNamedArrays`
         :returns: A transformed version of *dag*.
         """
