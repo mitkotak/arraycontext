@@ -40,7 +40,8 @@ from .metadata import _FirstAxisIsElementsTag
 from .container import (
         ArrayContainer, NotAnArrayContainerError,
         is_array_container, is_array_container_type,
-        get_container_context, get_container_context_recursively,
+        get_container_context_opt,
+        get_container_context_recursively, get_container_context_recursively_opt,
         serialize_container, deserialize_container,
         register_multivector_as_array_container)
 from .container.arithmetic import with_container_arithmetic
@@ -58,7 +59,7 @@ from .container.traversal import (
         rec_map_reduce_array_container,
         rec_multimap_reduce_array_container,
         thaw, freeze,
-        flatten, unflatten,
+        flatten, unflatten, flat_size_and_dtype,
         from_numpy, to_numpy,
         outer)
 
@@ -82,7 +83,9 @@ __all__ = (
         "ElementwiseMapKernelTag",
         "ArrayContainer", "NotAnArrayContainerError",
         "is_array_container", "is_array_container_type",
-        "get_container_context", "get_container_context_recursively",
+        "get_container_context_opt",
+        "get_container_context_recursively_opt",
+        "get_container_context_recursively",
         "serialize_container", "deserialize_container",
         "register_multivector_as_array_container",
         "with_container_arithmetic",
@@ -95,7 +98,7 @@ __all__ = (
         "map_reduce_array_container", "multimap_reduce_array_container",
         "rec_map_reduce_array_container", "rec_multimap_reduce_array_container",
         "thaw", "freeze",
-        "flatten", "unflatten",
+        "flatten", "unflatten", "flat_size_and_dtype",
         "from_numpy", "to_numpy",
         "outer",
 
@@ -124,6 +127,8 @@ def _deprecated_acf():
 
 
 _depr_name_to_replacement_and_obj = {
+        "get_container_context": ("get_container_context_opt",
+            get_container_context_opt),
         "FirstAxisIsElementsTag":
         ("meshmode.transform_metadata.FirstAxisIsElementsTag",
             _FirstAxisIsElementsTag),
@@ -147,6 +152,7 @@ if sys.version_info >= (3, 7):
 else:
     FirstAxisIsElementsTag = _FirstAxisIsElementsTag
     _acf = _deprecated_acf
+    get_container_context = get_container_context_opt
 
 # }}}
 

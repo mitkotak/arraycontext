@@ -960,24 +960,25 @@ def test_container_freeze_thaw(actx_factory):
 
     # {{{ check
 
-    from arraycontext import get_container_context
-    from arraycontext import get_container_context_recursively
+    from arraycontext import (
+            get_container_context_opt,
+            get_container_context_recursively_opt)
 
-    assert get_container_context(ary_of_dofs) is None
-    assert get_container_context(mat_of_dofs) is None
-    assert get_container_context(ary_dof) is actx
-    assert get_container_context(dc_of_dofs) is actx
+    assert get_container_context_opt(ary_of_dofs) is None
+    assert get_container_context_opt(mat_of_dofs) is None
+    assert get_container_context_opt(ary_dof) is actx
+    assert get_container_context_opt(dc_of_dofs) is actx
 
-    assert get_container_context_recursively(ary_of_dofs) is actx
-    assert get_container_context_recursively(mat_of_dofs) is actx
+    assert get_container_context_recursively_opt(ary_of_dofs) is actx
+    assert get_container_context_recursively_opt(mat_of_dofs) is actx
 
     for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
         frozen_ary = freeze(ary)
         thawed_ary = thaw(frozen_ary, actx)
         frozen_ary = freeze(thawed_ary)
 
-        assert get_container_context_recursively(frozen_ary) is None
-        assert get_container_context_recursively(thawed_ary) is actx
+        assert get_container_context_recursively_opt(frozen_ary) is None
+        assert get_container_context_recursively_opt(thawed_ary) is actx
 
     actx2 = actx.clone()
 
@@ -1068,12 +1069,24 @@ def test_flatten_array_container(actx_factory, shapes):
     # }}}
 
 
+def _checked_flatten(ary, actx, leaf_class=None):
+    from arraycontext import flatten, flat_size_and_dtype
+    result = flatten(ary, actx, leaf_class=leaf_class)
+
+    if leaf_class is None:
+        size, dtype = flat_size_and_dtype(ary)
+        assert result.shape == (size,)
+        assert result.dtype == dtype
+
+    return result
+
+
 def test_flatten_array_container_failure(actx_factory):
     actx = actx_factory()
 
-    from arraycontext import flatten, unflatten
+    from arraycontext import unflatten
     ary = _get_test_containers(actx, shapes=512)[0]
-    flat_ary = flatten(ary, actx)
+    flat_ary = _checked_flatten(ary, actx)
 
     with pytest.raises(TypeError):
         # cannot unflatten from a numpy array
@@ -1091,19 +1104,18 @@ def test_flatten_array_container_failure(actx_factory):
 def test_flatten_with_leaf_class(actx_factory):
     actx = actx_factory()
 
-    from arraycontext import flatten
     arys = _get_test_containers(actx, shapes=512)
 
-    flat = flatten(arys[0], actx, leaf_class=DOFArray)
+    flat = _checked_flatten(arys[0], actx, leaf_class=DOFArray)
     assert isinstance(flat, actx.array_types)
     assert flat.shape == (arys[0].size,)
 
-    flat = flatten(arys[1], actx, leaf_class=DOFArray)
+    flat = _checked_flatten(arys[1], actx, leaf_class=DOFArray)
     assert isinstance(flat, np.ndarray) and flat.dtype == object
     assert all(isinstance(entry, actx.array_types) for entry in flat)
     assert all(entry.shape == (arys[0].size,) for entry in flat)
 
-    flat = flatten(arys[3], actx, leaf_class=DOFArray)
+    flat = _checked_flatten(arys[3], actx, leaf_class=DOFArray)
     assert isinstance(flat, MyContainer)
     assert isinstance(flat.mass, actx.array_types)
     assert flat.mass.shape == (arys[3].mass.size,)
@@ -1433,6 +1445,8 @@ def test_array_container_with_numpy(actx_factory):
 # }}}
 
 
+# {{{ test_actx_compile_on_pure_array_return
+
 def test_actx_compile_on_pure_array_return(actx_factory):
     def _twice(x):
         return 2 * x
@@ -1441,6 +1455,55 @@ def test_actx_compile_on_pure_array_return(actx_factory):
     ones = actx.zeros(shape=(10, 4), dtype=np.float64) + 1
     np.testing.assert_allclose(actx.to_numpy(_twice(ones)),
                                actx.to_numpy(actx.compile(_twice)(ones)))
+
+# }}}
+
+
+# {{{
+
+def test_taggable_cl_array_tags(actx_factory):
+    actx = actx_factory()
+    if not isinstance(actx, PyOpenCLArrayContext):
+        pytest.skip(f"not relevant for '{type(actx).__name__}'")
+
+    import pyopencl.array as cl_array
+    ary = cl_array.to_device(actx.queue, np.zeros((32, 7)))
+
+    # {{{ check tags are set
+
+    from arraycontext.impl.pyopencl.taggable_cl_array import to_tagged_cl_array
+    tagged_ary = to_tagged_cl_array(ary, axes=None,
+                                    tags=frozenset((FirstAxisIsElementsTag(),)))
+
+    assert tagged_ary.base_data is ary.base_data
+    assert tagged_ary.tags == frozenset((FirstAxisIsElementsTag(),))
+
+    # }}}
+
+    # {{{ check tags are appended
+
+    from arraycontext import ElementwiseMapKernelTag
+    tagged_ary = to_tagged_cl_array(tagged_ary, axes=None,
+                                    tags=frozenset((ElementwiseMapKernelTag(),)))
+
+    assert tagged_ary.base_data is ary.base_data
+    assert tagged_ary.tags == frozenset(
+        (FirstAxisIsElementsTag(), ElementwiseMapKernelTag())
+    )
+
+    # }}}
+
+    # {{{ test copied tags
+
+    copy_tagged_ary = tagged_ary.copy()
+
+    assert copy_tagged_ary.tags == tagged_ary.tags
+    assert copy_tagged_ary.axes == tagged_ary.axes
+    assert copy_tagged_ary.base_data != tagged_ary.base_data
+
+    # }}}
+
+# }}}
 
 
 if __name__ == "__main__":
