@@ -64,10 +64,15 @@ from .container.traversal import (
         outer)
 
 from .impl.pyopencl import PyOpenCLArrayContext
-from .impl.pytato import PytatoPyOpenCLArrayContext
+
+from .impl.pytato import (PytatoPyOpenCLArrayContext,
+                          PytatoJAXArrayContext,
+                          _BasePytatoArrayContext)
 from .impl.pycuda import PyCUDAArrayContext
+from .impl.jax import EagerJAXArrayContext
 
 from .pytest import (
+        PytestArrayContextFactory,
         PytestPyOpenCLArrayContextFactory,
         PytestPyCUDAArrayContextFactory,
         pytest_generate_tests_for_array_contexts,
@@ -102,10 +107,14 @@ __all__ = (
         "from_numpy", "to_numpy",
         "outer",
 
+
         "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext","PyCUDAArrayContext",
+        "PytatoJAXArrayContext", "_BasePytatoArrayContext",
+        "EagerJAXArrayContext",
 
         "make_loopy_program",
 
+        "PytestArrayContextFactory",
         "PytestPyOpenCLArrayContextFactory",
         "PyCUDAArrayContextFactory",
         "pytest_generate_tests_for_array_contexts",

@@ -42,6 +42,8 @@ from arraycontext import (  # noqa: F401
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
                                  _PytestPytatoPyOpenCLArrayContextFactory,
                                  _PytestPyCUDAArrayContextFactory)
+                                 _PytestEagerJaxArrayContextFactory,
+                                 _PytestPytatoJaxArrayContextFactory)
 
 
 import logging
@@ -107,6 +109,11 @@ class _PyCUDAArrayContextForTestsFactory(
 
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
     _PyCUDAArrayContextForTestsFactory
+    _PyOpenCLArrayContextForTestsFactory,
+    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    _PytatoPyOpenCLArrayContextForTestsFactory,
+    _PytestEagerJaxArrayContextFactory,
+    _PytestPytatoJaxArrayContextFactory,
     ])
 
 def _acf():
@@ -309,6 +316,7 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ("all", 1, np.float64),
             ("arctan", 1, np.float64),
             ("atan", 1, np.float64),
+
             # float + complex
             ("sin", 1, np.float64),
             ("sin", 1, np.complex128),
