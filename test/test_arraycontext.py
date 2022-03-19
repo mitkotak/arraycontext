@@ -34,7 +34,7 @@ from arraycontext import (
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
-        ArrayContainer)
+        ArrayContainer,)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
