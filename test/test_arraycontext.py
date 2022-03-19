@@ -34,14 +34,12 @@ from arraycontext import (
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
-        PyCUDAArrayContext,
         ArrayContainer)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
-                                 _PytestPytatoPyOpenCLArrayContextFactory,
-                                 _PytestPyCUDAArrayContextFactory)
+                                 _PytestPytatoPyOpenCLArrayContextFactory)
 
 
 import logging
@@ -68,15 +66,6 @@ class _PytatoPyOpenCLArrayContextForTests(PytatoPyOpenCLArrayContext):
     def transform_loopy_program(self, t_unit):
         return t_unit
 
-class _PyCUDAArrayContextForTests(PyCUDAArrayContext):
-    """Like :class:`PyCUDAArrayContext`, but applies no program
-    transformations whatsoever. Only to be used for testing internal to
-    :mod:`arraycontext`.
-    """
-
-    def transform_loopy_program(self, t_unit):
-        return t_unit
-
 
 class _PyOpenCLArrayContextWithHostScalarsForTestsFactory(
         _PytestPyOpenCLArrayContextFactoryWithClass):
@@ -93,21 +82,12 @@ class _PytatoPyOpenCLArrayContextForTestsFactory(
     actx_class = _PytatoPyOpenCLArrayContextForTests
 
 
-class _PyCUDAArrayContextForTestsFactory(
-        _PytestPyCUDAArrayContextFactory):
-    actx_class = _PyCUDAArrayContextForTests
-
-
-#pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-    #_PyOpenCLArrayContextForTestsFactory,
-    #_PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    #_PytatoPyOpenCLArrayContextForTestsFactory,
-    #_PyCUDAArrayContextForTestsFactory,
-    #])
-
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-    _PyCUDAArrayContextForTestsFactory
+    _PyOpenCLArrayContextForTestsFactory,
+    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    _PytatoPyOpenCLArrayContextForTestsFactory,
     ])
+
 
 def _acf():
     import pyopencl as cl
@@ -309,6 +289,7 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ("all", 1, np.float64),
             ("arctan", 1, np.float64),
             ("atan", 1, np.float64),
+
             # float + complex
             ("sin", 1, np.float64),
             ("sin", 1, np.complex128),

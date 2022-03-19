@@ -57,7 +57,7 @@ class PytatoPyOpenCLArrayContext(ArrayContext):
     the arrays targeting OpenCL for offloading operations.
 
     .. attribute:: queue
-    
+
         A :class:`pyopencl.CommandQueue`.
 
     .. attribute:: allocator

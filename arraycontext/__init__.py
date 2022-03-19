@@ -65,11 +65,9 @@ from .container.traversal import (
 
 from .impl.pyopencl import PyOpenCLArrayContext
 from .impl.pytato import PytatoPyOpenCLArrayContext
-from .impl.pycuda import PyCUDAArrayContext
 
 from .pytest import (
         PytestPyOpenCLArrayContextFactory,
-        PytestPyCUDAArrayContextFactory,
         pytest_generate_tests_for_array_contexts,
         pytest_generate_tests_for_pyopencl_array_context)
 
@@ -81,6 +79,7 @@ __all__ = (
 
         "CommonSubexpressionTag",
         "ElementwiseMapKernelTag",
+
         "ArrayContainer", "NotAnArrayContainerError",
         "is_array_container", "is_array_container_type",
         "get_container_context_opt",
@@ -102,12 +101,11 @@ __all__ = (
         "from_numpy", "to_numpy",
         "outer",
 
-        "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext","PyCUDAArrayContext",
+        "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext",
 
         "make_loopy_program",
 
         "PytestPyOpenCLArrayContextFactory",
-        "PyCUDAArrayContextFactory",
         "pytest_generate_tests_for_array_contexts",
         "pytest_generate_tests_for_pyopencl_array_context"
         )
