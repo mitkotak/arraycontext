@@ -39,7 +39,7 @@ Here are some rules of thumb to use when dealing with thawing and freezing:
 -   Note that array contexts need not necessarily be passed as a separate
     argument. Passing thawed data as an argument to a function suffices
     to supply an array context. The array context can be extracted from
-    a thawed argument using, e.g., :func:`~arraycontext.get_container_context`
+    a thawed argument using, e.g., :func:`~arraycontext.get_container_context_opt`
     or :func:`~arraycontext.get_container_context_recursively`.
 
 What does this mean concretely?
@@ -334,7 +334,7 @@ class ArrayContext(ABC):
         return self.tag(tagged, out_ary)
 
     @abstractmethod
-    def clone(self):
+    def clone(self) -> "ArrayContext":
         """If possible, return a version of *self* that is semantically
         equivalent (i.e. implements all array operations in the same way)
         but is a separate object. May return *self* if that is not possible.
