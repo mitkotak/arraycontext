@@ -644,6 +644,8 @@ def test_array_equal_same_as_numpy(actx_factory):
 ])
 def test_array_context_einsum_array_manipulation(actx_factory, spec):
     actx = actx_factory()
+    if type(actx) == _PyCUDAArrayContextForTests:
+        pytest.skip("Waiting for loopy to be more capable")
 
     mat = actx.from_numpy(np.random.randn(10, 10))
     res = actx.to_numpy(actx.einsum(spec, mat,
@@ -659,7 +661,9 @@ def test_array_context_einsum_array_manipulation(actx_factory, spec):
 ])
 def test_array_context_einsum_array_matmatprods(actx_factory, spec):
     actx = actx_factory()
-
+    if type(actx) == _PyCUDAArrayContextForTests:
+        pytest.skip("Waiting for loopy to be more capable")
+        
     mat_a = actx.from_numpy(np.random.randn(5, 5))
     mat_b = actx.from_numpy(np.random.randn(5, 5))
     res = actx.to_numpy(actx.einsum(spec, mat_a, mat_b,
@@ -673,7 +677,9 @@ def test_array_context_einsum_array_matmatprods(actx_factory, spec):
 ])
 def test_array_context_einsum_array_tripleprod(actx_factory, spec):
     actx = actx_factory()
-
+    if type(actx) == _PyCUDAArrayContextForTests:
+        pytest.skip("Waiting for loopy to be more capable")
+    
     mat_a = actx.from_numpy(np.random.randn(7, 5))
     mat_b = actx.from_numpy(np.random.randn(5, 7))
     vec = actx.from_numpy(np.random.randn(7))

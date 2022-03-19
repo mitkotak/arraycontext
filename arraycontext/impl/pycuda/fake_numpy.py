@@ -28,9 +28,11 @@ THE SOFTWARE.
 
 from functools import partial, reduce
 import operator
+import numpy as np
 
 from arraycontext.fake_numpy import \
         BaseFakeNumpyNamespace, BaseFakeNumpyLinalgNamespace
+from arraycontext.container import NotAnArrayContainerError, serialize_container
 from arraycontext.container.traversal import (
         rec_multimap_array_container, rec_map_array_container,
         rec_map_reduce_array_container,
@@ -54,9 +56,8 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
 
     def __getattr__(self, name):
         print(name)
-        pycuda_funcs = ["abs", "sin", "cos", "tan", "arcsin", "arccos", "arctan",
-                "sinh", "cosh", "tanh", "exp", "log", "log10", "isnan",
-                "sqrt", "exp"]
+        pycuda_funcs = ["fabs", "ceil", "floor", "exp", "log", "log10", "sqrt",
+                "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh"]
         if name in pycuda_funcs:
             from functools import partial
             return partial(rec_map_array_container, getattr(cumath, name))
@@ -71,7 +72,39 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     # i.e. more like "are you two equal", and not like numpy semantics.
     # These operations provide access to numpy-style comparisons in that
     # case.
+    # def all(self, a):
+    #     return rec_map_reduce_array_container(
+    #             partial(reduce, pycuda.logical_and),
+    #             lambda subary: pycuda.all(subary), a)
+            
+    # def array_equal(self, a, b):
+    #     actx = self._array_context
 
+    #     # NOTE: pyopencl doesn't like `bool` much, so use `int8` instead
+    #     # false = actx.from_numpy(np.int8(False))
+
+    #     def rec_equal(x, y):
+    #         if type(x) != type(y):
+    #             return false
+
+    #         try:
+    #             iterable = zip(serialize_container(x), serialize_container(y))
+    #         except NotAnArrayContainerError:
+    #             if x.shape != y.shape:
+    #                 return false
+    #             else:
+    #                 return (x == y).all()
+    #         else:
+    #             return reduce(
+    #                     pycuda.logical_and,
+    #                     [rec_equal(ix, iy)for (_, ix), (_, iy) in iterable]
+    #                     )
+
+    #     result = rec_equal(a, b)
+    #     if not self._array_context._force_device_scalars:
+    #         result = result.get()[()]
+
+    #     return result
     def equal(self, x, y):
         return rec_multimap_array_container(operator.eq, x, y)
 
@@ -90,6 +123,10 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     def less_equal(self, x, y):
         return rec_multimap_array_container(operator.le, x, y)
 
+    # def logical_and(x1: gpuarray.GPUArray, x2: pycuda.tools.ScalarArg):
+    #     result = True
+    #     for i in range(len(x1)):
+    #         result = result and (x1[i] == x2)
     # }}}
 
     def maximum(self, x, y):

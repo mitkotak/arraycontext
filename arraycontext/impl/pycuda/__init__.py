@@ -36,9 +36,8 @@ from pytools.tag import Tag
 
 from arraycontext.context import ArrayContext
 
-
-if TYPE_CHECKING:
-    import pycuda
+import pycuda
+import pycuda.gpuarray as gpuarray
 
 
 # {{{ PyCUDAArrayContext
@@ -65,7 +64,8 @@ class PyCUDAArrayContext(ArrayContext):
             warn("Allocator is None")
         else:
             self.allocator = allocator
-
+        self.array_types = (gpuarray.GPUArray,)
+    
     def _get_fake_numpy_namespace(self):
         from arraycontext.impl.pycuda.fake_numpy import PyCUDAFakeNumpyNamespace
         return PyCUDAFakeNumpyNamespace(self)
