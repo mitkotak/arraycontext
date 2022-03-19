@@ -64,7 +64,6 @@ from .container.traversal import (
         outer)
 
 from .impl.pyopencl import PyOpenCLArrayContext
-
 from .impl.pytato import (PytatoPyOpenCLArrayContext,
                           PytatoJAXArrayContext,
                           _BasePytatoArrayContext)
@@ -86,6 +85,7 @@ __all__ = (
 
         "CommonSubexpressionTag",
         "ElementwiseMapKernelTag",
+
         "ArrayContainer", "NotAnArrayContainerError",
         "is_array_container", "is_array_container_type",
         "get_container_context_opt",
@@ -106,7 +106,6 @@ __all__ = (
         "flatten", "unflatten", "flat_size_and_dtype",
         "from_numpy", "to_numpy",
         "outer",
-
 
         "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext","PyCUDAArrayContext",
         "PytatoJAXArrayContext", "_BasePytatoArrayContext",

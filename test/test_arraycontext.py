@@ -687,7 +687,7 @@ def test_array_context_einsum_array_tripleprod(actx_factory, spec):
     actx = actx_factory()
     if type(actx) == _PyCUDAArrayContextForTests:
         pytest.skip("Waiting for loopy to be more capable")
-    
+
     mat_a = actx.from_numpy(np.random.randn(7, 5))
     mat_b = actx.from_numpy(np.random.randn(5, 7))
     vec = actx.from_numpy(np.random.randn(7))

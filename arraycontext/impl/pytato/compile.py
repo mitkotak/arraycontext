@@ -482,7 +482,7 @@ class CompiledPyOpenCLFunctionReturningArrayContainer(CompiledFunction):
         :attr:`CompiledFunction.pytato_program`. Output id is represented by
         the key of a leaf array in the array container
         :attr:`CompiledFunction.output_template`.
- 
+
     .. attribute:: output_template
 
        An instance of :class:`arraycontext.ArrayContainer` that is the return
