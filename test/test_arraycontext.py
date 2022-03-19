@@ -41,7 +41,7 @@ from arraycontext import (  # noqa: F401
         )
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
                                  _PytestPytatoPyOpenCLArrayContextFactory,
-                                 _PytestPyCUDAArrayContextFactory)
+                                 _PytestPyCUDAArrayContextFactory,
                                  _PytestEagerJaxArrayContextFactory,
                                  _PytestPytatoJaxArrayContextFactory)
 
@@ -99,22 +99,18 @@ class _PyCUDAArrayContextForTestsFactory(
         _PytestPyCUDAArrayContextFactory):
     actx_class = _PyCUDAArrayContextForTests
 
-
-#pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-    #_PyOpenCLArrayContextForTestsFactory,
-    #_PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    #_PytatoPyOpenCLArrayContextForTestsFactory,
-    #_PyCUDAArrayContextForTestsFactory,
-    #])
+# pytest_generate_tests = pytest_generate_tests_for_array_contexts([
+#     _PyCUDAArrayContextForTestsFactory,
+#     _PyOpenCLArrayContextForTestsFactory,
+#     _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+#     _PytatoPyOpenCLArrayContextForTestsFactory,
+#     _PytestEagerJaxArrayContextFactory,
+#     _PytestPytatoJaxArrayContextFactory,
+#     ])
 
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
     _PyCUDAArrayContextForTestsFactory
-    _PyOpenCLArrayContextForTestsFactory,
-    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    _PytatoPyOpenCLArrayContextForTestsFactory,
-    _PytestEagerJaxArrayContextFactory,
-    _PytestPytatoJaxArrayContextFactory,
-    ])
+])
 
 def _acf():
     import pyopencl as cl
