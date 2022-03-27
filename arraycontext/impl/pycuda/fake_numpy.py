@@ -165,6 +165,17 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
                 lambda *args: gpuarray.stack(arrays=args, axis=axis),
                 *arrays)
 
+    def ones_like(self, ary):
+        return self.full_like(ary, 1)
+
+    def full_like(self, ary, fill_value):
+        def _full_like(subary):
+            ones = self._array_context.empty_like(subary)
+            ones.fill(fill_value)
+            return ones
+
+        return self._new_like(ary, _full_like)
+
     def reshape(self, a, newshape):
         return gpuarray.reshape(a, newshape)
 
