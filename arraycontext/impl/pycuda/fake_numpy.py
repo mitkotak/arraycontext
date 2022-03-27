@@ -176,8 +176,8 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
 
         return self._new_like(ary, _full_like)
 
-    def reshape(self, a, newshape):
-        return gpuarray.reshape(a, newshape)
+    def reshape(self, a, newshape, order="C"):
+        return gpuarray.reshape(a, newshape, order=order)
 
     def concatenate(self, arrays, axis=0):
         return  gpuarray.concatenate(
