@@ -90,6 +90,55 @@ def test_dataclass_array_container():
 
     # }}}
 
+    # {{{ device arrays
+
+    from arraycontext import Array
+
+    @dataclass
+    class ArrayContainerWithArray:
+        x: Array
+        y: Array
+
+    dataclass_array_container(ArrayContainerWithArray)
+
+    # }}}
+
+# }}}
+
+
+# {{{ test_dataclass_container_unions
+
+def test_dataclass_container_unions():
+    from dataclasses import dataclass
+    from arraycontext import dataclass_array_container
+
+    from typing import Union
+    from arraycontext import Array
+
+    # {{{ union fields
+
+    @dataclass
+    class ArrayContainerWithUnion:
+        x: np.ndarray
+        y: Union[np.ndarray, Array]
+
+    dataclass_array_container(ArrayContainerWithUnion)
+
+    # }}}
+
+    # {{{ non-container union
+
+    @dataclass
+    class ArrayContainerWithWrongUnion:
+        x: np.ndarray
+        y: Union[np.ndarray, float]
+
+    with pytest.raises(TypeError):
+        # NOTE: float is not an ArrayContainer, so y should fail
+        dataclass_array_container(ArrayContainerWithWrongUnion)
+
+    # }}}
+
 # }}}
 
 

@@ -21,6 +21,8 @@ THE SOFTWARE.
 """
 
 from dataclasses import dataclass
+from typing import Union
+
 import numpy as np
 import pytest
 
@@ -34,12 +36,15 @@ from arraycontext import (
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
-        ArrayContainer,)
+        ArrayContainer,
+        to_numpy)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
 from arraycontext.pytest import (_PytestPyOpenCLArrayContextFactoryWithClass,
-                                 _PytestPytatoPyOpenCLArrayContextFactory)
+                                 _PytestPytatoPyOpenCLArrayContextFactory,
+                                 _PytestEagerJaxArrayContextFactory,
+                                 _PytestPytatoJaxArrayContextFactory)
 
 
 import logging
@@ -86,6 +91,8 @@ pytest_generate_tests = pytest_generate_tests_for_array_contexts([
     _PyOpenCLArrayContextForTestsFactory,
     _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
     _PytatoPyOpenCLArrayContextForTestsFactory,
+    _PytestEagerJaxArrayContextFactory,
+    _PytestPytatoJaxArrayContextFactory,
     ])
 
 
@@ -288,7 +295,6 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ("any", 1, np.float64),
             ("all", 1, np.float64),
             ("arctan", 1, np.float64),
-            ("atan", 1, np.float64),
 
             # float + complex
             ("sin", 1, np.float64),
@@ -672,36 +678,44 @@ def test_array_context_einsum_array_tripleprod(actx_factory, spec):
 # {{{ array container classes for test
 
 @with_container_arithmetic(bcast_obj_array=False,
-        eq_comparison=False, rel_comparison=False)
+        eq_comparison=False, rel_comparison=False,
+        _cls_has_array_context_attr=True)
 @dataclass_array_container
 @dataclass(frozen=True)
 class MyContainer:
     name: str
-    mass: DOFArray
+    mass: Union[DOFArray, np.ndarray]
     momentum: np.ndarray
-    enthalpy: DOFArray
+    enthalpy: Union[DOFArray, np.ndarray]
 
     @property
     def array_context(self):
-        return self.mass.array_context
+        if isinstance(self.mass, np.ndarray):
+            return next(iter(self.mass)).array_context
+        else:
+            return self.mass.array_context
 
 
 @with_container_arithmetic(
         bcast_obj_array=False,
         bcast_container_types=(DOFArray, np.ndarray),
         matmul=True,
-        rel_comparison=True,)
+        rel_comparison=True,
+        _cls_has_array_context_attr=True)
 @dataclass_array_container
 @dataclass(frozen=True)
 class MyContainerDOFBcast:
     name: str
-    mass: DOFArray
+    mass: Union[DOFArray, np.ndarray]
     momentum: np.ndarray
-    enthalpy: DOFArray
+    enthalpy: Union[DOFArray, np.ndarray]
 
     @property
     def array_context(self):
-        return self.mass.array_context
+        if isinstance(self.mass, np.ndarray):
+            return next(iter(self.mass)).array_context
+        else:
+            return self.mass.array_context
 
 
 def _get_test_containers(actx, ambient_dim=2, shapes=50_000):
@@ -1001,11 +1015,6 @@ def test_container_norm(actx_factory, ord):
     [(64, 7), (154, 12)]
     ])
 def test_flatten_array_container(actx_factory, shapes):
-    if np.prod(shapes) == 0:
-        # https://github.com/inducer/loopy/pull/497
-        # NOTE: only fails for the pytato array context at the moment
-        pytest.xfail("strides do not match in subary")
-
     actx = actx_factory()
 
     from arraycontext import flatten, unflatten
@@ -1485,6 +1494,14 @@ def test_taggable_cl_array_tags(actx_factory):
     # }}}
 
 # }}}
+
+
+def test_to_numpy_on_frozen_arrays(actx_factory):
+    # See https://github.com/inducer/arraycontext/issues/159
+    actx = actx_factory()
+    u = actx.freeze(actx.zeros(10, dtype="float64")+1)
+    np.testing.assert_allclose(actx.to_numpy(u), 1)
+    np.testing.assert_allclose(to_numpy(u, actx), 1)
 
 
 if __name__ == "__main__":

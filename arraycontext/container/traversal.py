@@ -68,7 +68,7 @@ from functools import update_wrapper, partial, singledispatch
 
 import numpy as np
 
-from arraycontext.context import ArrayContext, DeviceArray, _ScalarLike
+from arraycontext.context import ArrayContext, Array, _ScalarLike
 from arraycontext.container import (
         ArrayT, ContainerT, ArrayOrContainerT, NotAnArrayContainerError,
         serialize_container, deserialize_container)
@@ -384,7 +384,7 @@ def rec_keyed_map_array_container(
 def map_reduce_array_container(
         reduce_func: Callable[[Iterable[Any]], Any],
         map_func: Callable[[Any], Any],
-        ary: ArrayOrContainerT) -> "DeviceArray":
+        ary: ArrayOrContainerT) -> "Array":
     """Perform a map-reduce over array containers.
 
     :param reduce_func: callable used to reduce over the components of *ary*
@@ -407,7 +407,7 @@ def map_reduce_array_container(
 def multimap_reduce_array_container(
         reduce_func: Callable[[Iterable[Any]], Any],
         map_func: Callable[..., Any],
-        *args: Any) -> "DeviceArray":
+        *args: Any) -> "Array":
     r"""Perform a map-reduce over multiple array containers.
 
     :param reduce_func: callable used to reduce over the components of any
@@ -431,7 +431,7 @@ def rec_map_reduce_array_container(
         reduce_func: Callable[[Iterable[Any]], Any],
         map_func: Callable[[Any], Any],
         ary: ArrayOrContainerT,
-        leaf_class: Optional[type] = None) -> "DeviceArray":
+        leaf_class: Optional[type] = None) -> "Array":
     """Perform a map-reduce over array containers recursively.
 
     :param reduce_func: callable used to reduce over the components of *ary*
@@ -489,7 +489,7 @@ def rec_multimap_reduce_array_container(
         reduce_func: Callable[[Iterable[Any]], Any],
         map_func: Callable[..., Any],
         *args: Any,
-        leaf_class: Optional[type] = None) -> "DeviceArray":
+        leaf_class: Optional[type] = None) -> "Array":
     r"""Perform a map-reduce over multiple array containers recursively.
 
     :param reduce_func: callable used to reduce over the components of any
@@ -833,6 +833,9 @@ def to_numpy(ary: ArrayOrContainerT, actx: ArrayContext) -> Any:
     """
     def _to_numpy_with_check(subary: Any) -> Any:
         if isinstance(subary, actx.array_types) or np.isscalar(subary):
+            # NOTE: these are allowed by np.isscalar, but not here
+            assert not isinstance(subary, (str, bytes))
+
             return actx.to_numpy(subary)
         else:
             raise TypeError(
