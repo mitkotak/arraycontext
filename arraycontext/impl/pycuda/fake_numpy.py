@@ -76,39 +76,10 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     # i.e. more like "are you two equal", and not like numpy semantics.
     # These operations provide access to numpy-style comparisons in that
     # case.
-    # def all(self, a):
-    #     return rec_map_reduce_array_container(
-    #             partial(reduce, pycuda.logical_and),
-    #             lambda subary: pycuda.all(subary), a)
             
-    # def array_equal(self, a, b):
-    #     actx = self._array_context
+    def array_equal(self, x, y):
+        return rec_multimap_array_container(gpuarray.__eq__, x, y)
 
-    #     # NOTE: pyopencl doesn't like `bool` much, so use `int8` instead
-    #     # false = actx.from_numpy(np.int8(False))
-
-    #     def rec_equal(x, y):
-    #         if type(x) != type(y):
-    #             return false
-
-    #         try:
-    #             iterable = zip(serialize_container(x), serialize_container(y))
-    #         except NotAnArrayContainerError:
-    #             if x.shape != y.shape:
-    #                 return false
-    #             else:
-    #                 return (x == y).all()
-    #         else:
-    #             return reduce(
-    #                     pycuda.logical_and,
-    #                     [rec_equal(ix, iy)for (_, ix), (_, iy) in iterable]
-    #                     )
-
-    #     result = rec_equal(a, b)
-    #     if not self._array_context._force_device_scalars:
-    #         result = result.get()[()]
-
-    #     return result
     def equal(self, x, y):
         return rec_multimap_array_container(operator.eq, x, y)
 
@@ -178,7 +149,7 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
             ones.fill(fill_value)
             return ones
 
-        return self._new_like_me(ary, _full_like)
+        return self._new_like(ary, _full_like)
 
     def reshape(self, a, newshape, order="C"):
         return gpuarray.reshape(a, newshape, order=order)
