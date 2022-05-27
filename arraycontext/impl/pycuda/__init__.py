@@ -38,6 +38,7 @@ from arraycontext.context import ArrayContext
 
 import pycuda
 import pycuda.gpuarray as gpuarray
+import numpy as np
 
 
 # {{{ PyCUDAArrayContext
@@ -87,6 +88,8 @@ class PyCUDAArrayContext(ArrayContext):
         return gpuarray.to_gpu(array, allocator=self.allocator)
 
     def to_numpy(self, array):
+        if isinstance(array, (np.ndarray, int, float, complex)):
+            return array
         import pycuda.gpuarray as gpuarray
         return array.get()
 

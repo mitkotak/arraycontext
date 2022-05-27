@@ -55,14 +55,18 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
         return _PyCUDAFakeNumpyLinalgNamespace(self._array_context)
 
     def __getattr__(self, name):
-        print(name)
+        c_to_numpy_arc_functions = {
+            "atan": "arctan",
+            "atan2": "arctan2",
+            }
+
         pycuda_funcs = ["fabs", "ceil", "floor", "exp", "log", "log10", "sqrt",
                 "sin", "cos", "tan", "asin", "acos", "atan", "sinh", "cosh", "tanh"]
         if name in pycuda_funcs:
             from functools import partial
             return partial(rec_map_array_container, getattr(cumath, name))
         
-        return super().__getattr__(name)
+        return super().__getattr__(c_to_numpy_arc_functions.get(name, name))
 
     # {{{ comparisons
 
@@ -174,7 +178,7 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
             ones.fill(fill_value)
             return ones
 
-        return self._new_like(ary, _full_like)
+        return self._new_like_me(ary, _full_like)
 
     def reshape(self, a, newshape, order="C"):
         return gpuarray.reshape(a, newshape, order=order)

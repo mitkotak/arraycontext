@@ -329,7 +329,7 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ])
 def test_array_context_np_workalike(actx_factory, sym_name, n_args, dtype):
     actx = actx_factory()
-    if not hasattr(actx.np, sym_name):
+    if not hasattr(actx.np, sym_name) or ((type(actx) == _PyCUDAArrayContextForTests) and (sym_name in ['arctan2','arctan'])):
         pytest.skip(f"'{sym_name}' not implemented on '{type(actx).__name__}'")
 
     ndofs = 512
@@ -341,8 +341,11 @@ def test_array_context_np_workalike(actx_factory, sym_name, n_args, dtype):
             }
 
     def evaluate(_np, *_args):
-        func = getattr(_np, sym_name,
-                getattr(_np, c_to_numpy_arc_functions.get(sym_name, sym_name)))
+        if (type(actx) == _PyCUDAArrayContextForTests) and (sym_name in ['atan2','atan']):
+            func = getattr(_np, sym_name,getattr(_np, sym_name))
+        else:
+            func = getattr(_np, sym_name,
+                    getattr(_np, c_to_numpy_arc_functions.get(sym_name, sym_name)))
 
         return func(*_args)
 
