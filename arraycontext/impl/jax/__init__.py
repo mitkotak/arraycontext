@@ -1,7 +1,6 @@
 """
 .. currentmodule:: arraycontext
 .. autoclass:: EagerJAXArrayContext
-.. autoclass:: JITCompilingJAXArrayContext
 """
 
 __copyright__ = """
@@ -30,23 +29,23 @@ THE SOFTWARE.
 
 import numpy as np
 
-from typing import Sequence, Union, Callable, Any
-from pytools.tag import Tag
+from typing import Union, Callable, Any
+from pytools.tag import ToTagSetConvertible
 from arraycontext.context import ArrayContext, _ScalarLike
 
 
 class EagerJAXArrayContext(ArrayContext):
     """
-    A :class:`ArrayContext` that uses :mod:`jax.numpy.DeviceArray` instances
-    for its base array class. Performs all array operations eagerly. See
+    A :class:`ArrayContext` that uses
+    :class:`jaxlib.xla_extension.DeviceArrayBase` instances for its base array
+    class and performs all array operations eagerly. See
     :class:`~arraycontext.PytatoJAXArrayContext` for a lazier version.
 
     .. note::
 
-        JAX stores a global configuration state in the module
-        :mod:`jax.config`. Callers are expected to maintain those. Most
-        important for scientific computing workloads being
-        ``jax_enable_x64``.
+        JAX stores a global configuration state in :data:`jax.config`. Callers
+        are expected to maintain those. Most important for scientific computing
+        workloads being ``jax_enable_x64``.
     """
 
     def __init__(self) -> None:
@@ -56,8 +55,8 @@ class EagerJAXArrayContext(ArrayContext):
         self.array_types = (DeviceArray, )
 
     def _get_fake_numpy_namespace(self):
-        from .fake_numpy import JAXFakeNumpyNamespace
-        return JAXFakeNumpyNamespace(self)
+        from .fake_numpy import EagerJAXFakeNumpyNamespace
+        return EagerJAXFakeNumpyNamespace(self)
 
     # {{{ ArrayContext interface
 
@@ -74,17 +73,15 @@ class EagerJAXArrayContext(ArrayContext):
         return jax.device_put(array)
 
     def to_numpy(self, array):
-        if np.isscalar(array):
-            return array
-
         import jax
+        # jax.device_get can take scalars as well.
         return jax.device_get(array)
 
     def call_loopy(self, t_unit, **kwargs):
         raise NotImplementedError("calling loopy on JAX arrays"
                                   " not supported. Maybe rewrite"
                                   " the loopy kernel as numpy-flavored array"
-                                  " operations.")
+                                  " operations using ArrayContext.np.")
 
     def freeze(self, array):
         return array.block_until_ready()
@@ -94,11 +91,11 @@ class EagerJAXArrayContext(ArrayContext):
 
     # }}}
 
-    def tag(self, tags: Union[Sequence[Tag], Tag], array):
+    def tag(self, tags: ToTagSetConvertible, array):
         # Sorry, not capable.
         return array
 
-    def tag_axis(self, iaxis, tags: Union[Sequence[Tag], Tag], array):
+    def tag_axis(self, iaxis, tags: ToTagSetConvertible, array):
         # TODO: See `jax.experiemental.maps.xmap`, proabably that should be useful?
         return array
 

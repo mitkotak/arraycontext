@@ -1,3 +1,5 @@
+# mypy: disallow-untyped-defs
+
 """
 .. _freeze-thaw:
 
@@ -75,18 +77,8 @@ The interface of an array context
 
 .. currentmodule:: arraycontext
 
-.. class:: DeviceArray
-
-    A (type alias for an) array type supported by the :class:`ArrayContext`
-    meant to aid in typing annotations. For a explicit list of supported types
-    see :attr:`ArrayContext.array_types`.
-
-.. class:: DeviceScalar
-
-    A (type alias for a) scalar type supported by the :class:`ArrayContext`
-    meant to aid in typing annotations, e.g. for reductions. In :mod:`numpy`
-    terminology, this is just an array with a shape of ``()``.
-
+.. autoclass:: Array
+.. autoclass:: Scalar
 .. autoclass:: ArrayContext
 """
 
@@ -115,17 +107,72 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
-from typing import Sequence, Union, Callable, Any, Tuple
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractmethod
+from typing import (
+        Any, Callable, Dict, Optional, Tuple, Union,
+        TYPE_CHECKING)
 
 import numpy as np
 from pytools import memoize_method
-from pytools.tag import Tag
+from pytools.tag import ToTagSetConvertible
+
+if TYPE_CHECKING:
+    import loopy
 
 
-DeviceArray = Any
-DeviceScalar = Any
+# {{{ typing
+
 _ScalarLike = Union[int, float, complex, np.generic]
+
+try:
+    from typing import Protocol
+except ImportError:
+    from typing_extensions import Protocol                  # type: ignore[misc]
+
+
+class Array(Protocol):
+    """A :class:`~typing.Protocol` for the array type supported by
+    :class:`ArrayContext`.
+
+    This is meant to aid in typing annotations. For a explicit list of
+    supported types see :attr:`ArrayContext.array_types`.
+
+    .. attribute:: shape
+    .. attribute:: dtype
+    """
+
+    @property
+    def shape(self) -> Tuple[int, ...]:
+        ...
+
+    @property
+    def dtype(self) -> "np.dtype[Any]":
+        ...
+
+
+class Scalar(Protocol):
+    """A :class:`~typing.Protocol` for the scalar type supported by
+    :class:`ArrayContext`.
+
+    In :mod:`numpy` terminology, this is just an array with a shape of ``()``.
+
+    This is meant to aid in typing annotations. For a explicit list of
+    supported types see :attr:`ArrayContext.array_types`.
+
+    .. attribute:: shape
+    .. attribute:: dtype
+    """
+
+    @property
+    def shape(self) -> Tuple[()]:
+        ...
+
+    @property
+    def dtype(self) -> "np.dtype[Any]":
+        ...
+
+
+# }}}
 
 
 # {{{ ArrayContext
@@ -166,8 +213,10 @@ class ArrayContext(ABC):
 
     .. attribute:: array_types
 
-        A :class:`tuple` of types that are the valid base array classes
-        the context can operate on.
+        A :class:`tuple` of types that are the valid array classes the
+        context can operate on. However, it is not necessary that *all* the
+        :class:`ArrayContext`\ 's operations would be legal for the types in
+        *array_types*.
 
     .. automethod:: freeze
     .. automethod:: thaw
@@ -178,29 +227,35 @@ class ArrayContext(ABC):
 
     array_types: Tuple[type, ...] = ()
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.np = self._get_fake_numpy_namespace()
 
-    def _get_fake_numpy_namespace(self):
+    def _get_fake_numpy_namespace(self) -> Any:
         from .fake_numpy import BaseFakeNumpyNamespace
         return BaseFakeNumpyNamespace(self)
 
     @abstractmethod
-    def empty(self, shape, dtype):
+    def empty(self,
+              shape: Union[int, Tuple[int, ...]],
+              dtype: "np.dtype[Any]") -> Array:
         pass
 
     @abstractmethod
-    def zeros(self, shape, dtype):
+    def zeros(self,
+              shape: Union[int, Tuple[int, ...]],
+              dtype: "np.dtype[Any]") -> Array:
         pass
 
-    def empty_like(self, ary):
+    def empty_like(self, ary: Array) -> Array:
         return self.empty(shape=ary.shape, dtype=ary.dtype)
 
-    def zeros_like(self, ary):
+    def zeros_like(self, ary: Array) -> Array:
         return self.zeros(shape=ary.shape, dtype=ary.dtype)
 
     @abstractmethod
-    def from_numpy(self, array: Union[np.ndarray, _ScalarLike]):
+    def from_numpy(self,
+                   array: Union["np.ndarray[Any, Any]", _ScalarLike]
+                   ) -> Union[Array, _ScalarLike]:
         r"""
         :returns: the :class:`numpy.ndarray` *array* converted to the
             array context's array type. The returned array will be
@@ -209,7 +264,9 @@ class ArrayContext(ABC):
         pass
 
     @abstractmethod
-    def to_numpy(self, array):
+    def to_numpy(self,
+                 array: Union[Array, _ScalarLike]
+                 ) -> Union["np.ndarray[Any, Any]", _ScalarLike]:
         r"""
         :returns: *array*, an array recognized by the context, converted
             to a :class:`numpy.ndarray`. *array* must be
@@ -217,7 +274,9 @@ class ArrayContext(ABC):
         """
         pass
 
-    def call_loopy(self, program, **kwargs):
+    def call_loopy(self,
+                   program: "loopy.TranslationUnit",
+                   **kwargs: Any) -> Dict[str, Array]:
         """Execute the :mod:`loopy` program *program* on the arguments
         *kwargs*.
 
@@ -230,7 +289,7 @@ class ArrayContext(ABC):
         """
 
     @abstractmethod
-    def freeze(self, array):
+    def freeze(self, array: Array) -> Array:
         """Return a version of the context-defined array *array* that is
         'frozen', i.e. suitable for long-term storage and reuse. Frozen arrays
         do not support arithmetic. For example, in the context of
@@ -246,7 +305,7 @@ class ArrayContext(ABC):
         """
 
     @abstractmethod
-    def thaw(self, array):
+    def thaw(self, array: Array) -> Array:
         """Take a 'frozen' array and return a new array representing the data in
         *array* that is able to perform arithmetic and other operations, using
         the execution resources of this context. In the context of
@@ -261,7 +320,9 @@ class ArrayContext(ABC):
         """
 
     @abstractmethod
-    def tag(self, tags: Union[Sequence[Tag], Tag], array):
+    def tag(self,
+            tags: ToTagSetConvertible,
+            array: Array) -> Array:
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* with the *tags* applied. *array*
         itself is not modified.
@@ -270,7 +331,9 @@ class ArrayContext(ABC):
         """
 
     @abstractmethod
-    def tag_axis(self, iaxis, tags: Union[Sequence[Tag], Tag], array):
+    def tag_axis(self,
+                 iaxis: int, tags: ToTagSetConvertible,
+                 array: Array) -> Array:
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* in which axis number *iaxis* has
         the *tags* applied. *array* itself is not modified.
@@ -279,7 +342,9 @@ class ArrayContext(ABC):
         """
 
     @memoize_method
-    def _get_einsum_prg(self, spec, arg_names, tagged):
+    def _get_einsum_prg(self,
+                        spec: str, arg_names: Tuple[str, ...],
+                        tagged: ToTagSetConvertible) -> "loopy.TranslationUnit":
         import loopy as lp
         from .loopy import _DEFAULT_LOOPY_OPTIONS
         from loopy.version import MOST_RECENT_LANGUAGE_VERSION
@@ -305,7 +370,10 @@ class ArrayContext(ABC):
     # That's why einsum's interface here needs to be cluttered with
     # metadata, and that's why it can't live under .np.
     # [1] https://github.com/inducer/meshmode/issues/177
-    def einsum(self, spec, *args, arg_names=None, tagged=()):
+    def einsum(self,
+               spec: str, *args: Array,
+               arg_names: Optional[Tuple[str, ...]] = None,
+               tagged: ToTagSetConvertible = ()) -> Array:
         """Computes the result of Einstein summation following the
         convention in :func:`numpy.einsum`.
 
@@ -325,7 +393,7 @@ class ArrayContext(ABC):
         :return: the output of the einsum :mod:`loopy` program
         """
         if arg_names is None:
-            arg_names = tuple("arg%d" % i for i in range(len(args)))
+            arg_names = tuple([f"arg{i}" for i in range(len(args))])
 
         prg = self._get_einsum_prg(spec, arg_names, tagged)
         out_ary = self.call_loopy(
@@ -373,22 +441,28 @@ class ArrayContext(ABC):
         return f
 
     # undocumented for now
-    @abstractproperty
-    def permits_inplace_modification(self):
-        pass
+    @property
+    @abstractmethod
+    def permits_inplace_modification(self) -> bool:
+        """
+        *True* if the arrays allow in-place modifications.
+        """
 
     # undocumented for now
-    @abstractproperty
-    def supports_nonscalar_broadcasting(self):
-        pass
+    @property
+    @abstractmethod
+    def supports_nonscalar_broadcasting(self) -> bool:
+        """
+        *True* if the arrays support non-scalar broadcasting.
+        """
 
-    @abstractproperty
-    def permits_advanced_indexing(self):
+    # undocumented for now
+    @property
+    @abstractmethod
+    def permits_advanced_indexing(self) -> bool:
         """
-        *True* only if the arrays support :mod:`numpy`'s advanced indexing
-        semantics.
+        *True* if the arrays support :mod:`numpy`'s advanced indexing semantics.
         """
-        pass
 
 # }}}
 

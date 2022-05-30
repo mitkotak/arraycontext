@@ -41,11 +41,12 @@ def main():
             "numpy",
 
             # https://github.com/inducer/arraycontext/pull/147
-            "pytools>=2022.1.1",
+            "pytools>=2022.1.3",
 
             "pytest>=2.3",
             "loopy>=2019.1",
             "dataclasses; python_version<'3.7'",
+            "typing_extensions; python_version<'3.9'",
             "types-dataclasses",
         ],
         package_data={"arraycontext": ["py.typed"]},

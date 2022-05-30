@@ -35,31 +35,23 @@ import numpy
 import jax.numpy as jnp
 
 
-class JAXFakeNumpyLinalgNamespace(BaseFakeNumpyLinalgNamespace):
+class EagerJAXFakeNumpyLinalgNamespace(BaseFakeNumpyLinalgNamespace):
     # Everything is implemented in the base class for now.
     pass
 
 
-class JAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
+class EagerJAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
     """
-    A :mod:`numpy` mimic for :class:`JAXArrayContext`.
+    A :mod:`numpy` mimic for :class:`~arraycontext.EagerJAXArrayContext`.
     """
     def _get_fake_numpy_linalg_namespace(self):
-        return JAXFakeNumpyLinalgNamespace(self._array_context)
-
-    _jax_funcs = {"abs", "sin", "cos", "tan", "arcsin", "arccos",
-                  "arctan", "sinh", "cosh", "tanh", "exp", "log", "log10",
-                  "isnan", "sqrt", "exp", "conj"}
+        return EagerJAXFakeNumpyLinalgNamespace(self._array_context)
 
     def __getattr__(self, name):
-        if name in self._jax_funcs:
-            from functools import partial
-            return partial(rec_map_array_container, getattr(jnp, name))
-
-        raise AttributeError(f"{type(self)} object has no attribute '{name}'")
+        return partial(rec_multimap_array_container, getattr(jnp, name))
 
     def reshape(self, a, newshape, order="C"):
-        return rec_multimap_array_container(
+        return rec_map_array_container(
             lambda ary: jnp.reshape(ary, newshape, order=order),
             a)
 
@@ -68,15 +60,6 @@ class JAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
 
     def concatenate(self, arrays, axis=0):
         return rec_multimap_array_container(jnp.concatenate, arrays, axis)
-
-    def ones_like(self, ary):
-        return jnp.ones_like(ary)
-
-    def maximum(self, x, y):
-        return rec_multimap_array_container(jnp.maximum, x, y)
-
-    def minimum(self, x, y):
-        return rec_multimap_array_container(jnp.minimum, x, y)
 
     def where(self, criterion, then, else_):
         return rec_multimap_array_container(jnp.where, criterion, then, else_)
@@ -100,14 +83,6 @@ class JAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
         return rec_multimap_array_container(
             lambda *args: jnp.stack(arrays=args, axis=axis),
             *arrays)
-
-    # {{{ relational operators
-
-    def equal(self, x, y):
-        return rec_multimap_array_container(jnp.equal, x, y)
-
-    def not_equal(self, x, y):
-        return rec_multimap_array_container(jnp.not_equal, x, y)
 
     def array_equal(self, a, b):
         actx = self._array_context
@@ -134,36 +109,21 @@ class JAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
 
         return rec_equal(a, b)
 
-    def greater(self, x, y):
-        return rec_multimap_array_container(jnp.greater, x, y)
-
-    def greater_equal(self, x, y):
-        return rec_multimap_array_container(jnp.greater_equal, x, y)
-
-    def less(self, x, y):
-        return rec_multimap_array_container(jnp.less, x, y)
-
-    def less_equal(self, x, y):
-        return rec_multimap_array_container(jnp.less_equal, x, y)
-
-    # }}}
-
-    def arctan2(self, y, x):
-        return rec_multimap_array_container(jnp.arctan2, y, x)
-
     def ravel(self, a, order="C"):
-        def _rec_ravel(a):
-            if order in "FC":
-                return jnp.ravel(a, order=order)
-            elif order in "AK":
-                # flattening in a C-order
-                # memory layout is assumed to be "C"
-                return jnp.ravel(a, order="C")
-            else:
-                raise ValueError("`order` can be one of 'F', 'C', 'A' or 'K'. "
-                                 f"(got {order})")
+        """
+        .. warning::
 
-        return rec_map_array_container(_rec_ravel, a)
+            Since :func:`jax.numpy.reshape` does not support orders `A`` and
+            ``K``, in such cases we fallback to using ``order = C``.
+        """
+        if order in "AK":
+            from warnings import warn
+            warn(f"ravel with order='{order}' not supported by JAX,"
+                 " using order=C.")
+            order = "C"
+
+        return rec_map_array_container(lambda subary: jnp.ravel(subary, order=order),
+                                       a)
 
     def vdot(self, x, y, dtype=None):
         from arraycontext import rec_multimap_reduce_array_container
@@ -172,24 +132,12 @@ class JAXFakeNumpyNamespace(BaseFakeNumpyNamespace):
             if dtype not in [None, numpy.find_common_type((ary1.dtype,
                                                            ary2.dtype),
                                                           ())]:
-                raise NotImplementedError("JAXArrayContext cannot take dtype in"
+                raise NotImplementedError(f"{type(self)} cannot take dtype in"
                                           " vdot.")
 
             return jnp.vdot(ary1, ary2)
 
         return rec_multimap_reduce_array_container(sum, _rec_vdot, x, y)
-
-    def any(self, a):
-        return rec_map_reduce_array_container(
-                partial(reduce, partial(jnp.logical_or)),
-                lambda subary: subary.any(),
-                a)
-
-    def all(self, a):
-        return rec_map_reduce_array_container(
-                partial(reduce, partial(jnp.logical_and)),
-                lambda subary: subary.all(),
-                a)
 
     def broadcast_to(self, array, shape):
         return rec_map_array_container(partial(jnp.broadcast_to, shape=shape), array)

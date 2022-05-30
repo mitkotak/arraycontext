@@ -46,8 +46,8 @@ THE SOFTWARE.
 from arraycontext.context import ArrayContext, _ScalarLike
 from arraycontext.container.traversal import rec_map_array_container
 import numpy as np
-from typing import Any, Callable, Union, Sequence, TYPE_CHECKING, Tuple, Type
-from pytools.tag import Tag
+from typing import Any, Callable, Union, TYPE_CHECKING, Tuple, Type
+from pytools.tag import ToTagSetConvertible
 import abc
 
 if TYPE_CHECKING:
@@ -66,9 +66,7 @@ class _BasePytatoArrayContext(ArrayContext, abc.ABC):
     .. automethod:: compile
     """
     def __init__(self):
-        import pytato as pt
         super().__init__()
-        self.array_types = (pt.Array, )
         self._freeze_prg_cache = {}
         self._dag_transform_cache = {}
 
@@ -76,27 +74,12 @@ class _BasePytatoArrayContext(ArrayContext, abc.ABC):
         from arraycontext.impl.pytato.fake_numpy import PytatoFakeNumpyNamespace
         return PytatoFakeNumpyNamespace(self)
 
-    def clone(self):
-        raise NotImplementedError(f".clone() not supported for {type(self)}.")
-
     def empty(self, shape, dtype):
-        raise ValueError("PytatoPyOpenCLArrayContext does not support empty")
+        raise ValueError(f"{type(self).__name__} does not support empty")
 
     def zeros(self, shape, dtype):
         import pytato as pt
         return pt.zeros(shape, dtype)
-
-    def from_numpy(self, array: Union[np.ndarray, _ScalarLike]):
-        raise NotImplementedError()
-
-    def to_numpy(self, array):
-        raise NotImplementedError()
-
-    def freeze(self, array):
-        raise NotImplementedError()
-
-    def thaw(self, array):
-        raise NotImplementedError()
 
     def transform_dag(self, dag: "pytato.DictOfNamedArrays"
                       ) -> "pytato.DictOfNamedArrays":
@@ -113,17 +96,9 @@ class _BasePytatoArrayContext(ArrayContext, abc.ABC):
         return dag
 
     def transform_loopy_program(self, t_unit):
-        raise ValueError("_BasePytatoArrayContext does not implement "
+        raise ValueError(f"{type(self)} does not implement "
                          "transform_loopy_program. Sub-classes are supposed "
                          "to implement it.")
-
-    @abc.abstractmethod
-    def tag(self, tags: Union[Sequence[Tag], Tag], array):
-        pass
-
-    @abc.abstractmethod
-    def tag_axis(self, iaxis, tags: Union[Sequence[Tag], Tag], array):
-        pass
 
     @abc.abstractproperty
     def frozen_array_types(self) -> Tuple[Type, ...]:
@@ -171,9 +146,12 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
     """
 
     def __init__(self, queue, allocator=None):
+        import pytato as pt
+        import pyopencl.array as cla
         super().__init__()
         self.queue = queue
         self.allocator = allocator
+        self.array_types = (pt.Array, cla.Array)
 
         # unused, but necessary to keep the context alive
         self.context = self.queue.context
@@ -202,6 +180,7 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
         return (cla.Array, )
 
     def call_loopy(self, program, **kwargs):
+        import pytato as pt
         from pytato.scalar_expr import SCALAR_CLASSES
         from pytato.loopy import call_loopy
         from arraycontext.impl.pyopencl.taggable_cl_array import TaggableCLArray
@@ -213,7 +192,7 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
         processed_kwargs = {}
 
         for kw, arg in sorted(kwargs.items()):
-            if isinstance(arg, self.array_types + SCALAR_CLASSES):
+            if isinstance(arg, (pt.Array,) + SCALAR_CLASSES):
                 pass
             elif isinstance(arg, TaggableCLArray):
                 arg = self.thaw(arg)
@@ -253,8 +232,8 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
                                       axes=get_cl_axes_from_pt_axes(array.axes),
                                       tags=array.tags)
         if not isinstance(array, pt.Array):
-            raise TypeError("PytatoPyOpenCLArrayContext.freeze invoked with "
-                            f"non-pytato array of type '{type(array)}'")
+            raise TypeError(f"{type(self).__name__}.freeze invoked "
+                            f"with non-pytato array of type '{type(array)}'")
 
         # {{{ early exit for 0-sized arrays
 
@@ -313,7 +292,7 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
         elif isinstance(array, cl_array.Array):
             array = to_tagged_cl_array(array, axes=None, tags=frozenset())
         else:
-            raise TypeError("PytatoPyOpenCLArrayContext.thaw expects "
+            raise TypeError(f"{type(self).__name__}.thaw expects "
                             "'TaggableCLArray' or 'cl.array.Array' got "
                             f"{type(array)}.")
 
@@ -333,14 +312,14 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
         dag = pt.transform.materialize_with_mpms(dag)
         return dag
 
-    def tag(self, tags: Union[Sequence[Tag], Tag], array):
+    def tag(self, tags: ToTagSetConvertible, array):
         return rec_map_array_container(lambda x: x.tagged(tags),
                                        array)
 
-    def tag_axis(self, iaxis, tags: Union[Sequence[Tag], Tag], array):
-        return rec_map_array_container(lambda x: x.with_tagged_axis(iaxis,
-                                                                     tags),
-                                        array)
+    def tag_axis(self, iaxis, tags: ToTagSetConvertible, array):
+        return rec_map_array_container(
+            lambda x: x.with_tagged_axis(iaxis, tags),
+            array)
 
     def einsum(self, spec, *args, arg_names=None, tagged=()):
         import pyopencl.array as cla
@@ -387,10 +366,16 @@ class PytatoPyOpenCLArrayContext(_BasePytatoArrayContext):
 
 class PytatoJAXArrayContext(_BasePytatoArrayContext):
     """
-    An arraycontext that uses a :mod:`pytato` to represent the thawed state of
+    An arraycontext that uses :mod:`pytato` to represent the thawed state of
     the arrays and compiles the expressions using
-    :mod:`pytato.target.python.JAXPythonTarget`.
+    :class:`pytato.target.python.JAXPythonTarget`.
     """
+
+    def __init__(self):
+        import pytato as pt
+        from jax.numpy import DeviceArray
+        super().__init__()
+        self.array_types = (pt.Array, DeviceArray)
 
     def clone(self):
         return type(self)()
@@ -446,9 +431,8 @@ class PytatoJAXArrayContext(_BasePytatoArrayContext):
 
     def thaw(self, array):
         import pytato as pt
-        from jax.numpy import DeviceArray
 
-        if not isinstance(array, DeviceArray):
+        if not isinstance(array, self.frozen_array_types):
             raise TypeError(f"{type(self)}.thaw expects jax device arrays, got "
                             f"{type(array)}")
 
@@ -458,7 +442,7 @@ class PytatoJAXArrayContext(_BasePytatoArrayContext):
         from .compile import LazilyJAXCompilingFunctionCaller
         return LazilyJAXCompilingFunctionCaller(self, f)
 
-    def tag(self, tags: Union[Sequence[Tag], Tag], array):
+    def tag(self, tags: ToTagSetConvertible, array):
         import pytato as pt
         from jax.numpy import DeviceArray
 
@@ -471,7 +455,7 @@ class PytatoJAXArrayContext(_BasePytatoArrayContext):
 
         return rec_map_array_container(_rec_tag, array)
 
-    def tag_axis(self, iaxis, tags: Union[Sequence[Tag], Tag], array):
+    def tag_axis(self, iaxis, tags: ToTagSetConvertible, array):
         import pytato as pt
         from jax.numpy import DeviceArray
 
