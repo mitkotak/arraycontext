@@ -78,7 +78,26 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     # case.
             
     def array_equal(self, x, y):
-        return rec_multimap_array_container(gpuarray.__eq__, x, y)
+        actx = self._array_context
+        false = actx.from_numpy(np.int8(False))
+        def rec_equal(x, y):
+            if type(x) != type(y):
+                return false
+            
+            try:
+                iterable = zip(serialize_container(x), serialize_container(y))
+            except NotAnArrayContainerError:
+                if x.shape != y.shape:
+                    return false
+                else:
+                    return (x == y).get().all()
+            else:
+                return reduce(
+                    partial(gpuarray.minimum),
+                    [rec_equal(ix, iy) for (_, ix),(_, iy) in iterable]
+                )
+
+        return rec_equal(x, y)
 
     def equal(self, x, y):
         return rec_multimap_array_container(operator.eq, x, y)

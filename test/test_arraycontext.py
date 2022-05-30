@@ -99,18 +99,14 @@ class _PyCUDAArrayContextForTestsFactory(
         _PytestPyCUDAArrayContextFactory):
     actx_class = _PyCUDAArrayContextForTests
 
-# pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-#     _PyCUDAArrayContextForTestsFactory,
-#     _PyOpenCLArrayContextForTestsFactory,
-#     _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-#     _PytatoPyOpenCLArrayContextForTestsFactory,
-#     _PytestEagerJaxArrayContextFactory,
-#     _PytestPytatoJaxArrayContextFactory,
-#     ])
-
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
-    _PyCUDAArrayContextForTestsFactory
-])
+    _PyCUDAArrayContextForTestsFactory,
+    _PyOpenCLArrayContextForTestsFactory,
+    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    _PytatoPyOpenCLArrayContextForTestsFactory,
+    _PytestEagerJaxArrayContextFactory,
+    _PytestPytatoJaxArrayContextFactory,
+    ])
 
 def _acf():
     import pyopencl as cl
@@ -311,7 +307,6 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ("any", 1, np.float64),
             ("all", 1, np.float64),
             ("arctan", 1, np.float64),
-            ("atan", 1, np.float64),
 
             # float + complex
             ("sin", 1, np.float64),
@@ -329,7 +324,7 @@ def assert_close_to_numpy_in_containers(actx, op, args):
             ])
 def test_array_context_np_workalike(actx_factory, sym_name, n_args, dtype):
     actx = actx_factory()
-    if not hasattr(actx.np, sym_name) or ((type(actx) == _PyCUDAArrayContextForTests) and (sym_name in ['arctan2','arctan'])):
+    if not hasattr(actx.np, sym_name) or (isinstance(actx, PyCUDAArrayContext) and (sym_name in ['arctan2','arctan'])):
         pytest.skip(f"'{sym_name}' not implemented on '{type(actx).__name__}'")
 
     ndofs = 512
@@ -341,11 +336,8 @@ def test_array_context_np_workalike(actx_factory, sym_name, n_args, dtype):
             }
 
     def evaluate(_np, *_args):
-        if (type(actx) == _PyCUDAArrayContextForTests) and (sym_name in ['atan2','atan']):
-            func = getattr(_np, sym_name,getattr(_np, sym_name))
-        else:
-            func = getattr(_np, sym_name,
-                    getattr(_np, c_to_numpy_arc_functions.get(sym_name, sym_name)))
+        func = getattr(_np, sym_name,
+                getattr(_np, c_to_numpy_arc_functions.get(sym_name, sym_name)))
 
         return func(*_args)
 
@@ -511,7 +503,7 @@ def test_dof_array_arithmetic_same_as_numpy(actx_factory):
                         if not use_integers
                         else randrange(3, 200))
                     for is_array_flag in is_array_flags]
-
+    
             # {{{ get reference numpy result
 
             # make a copy for the in place operators
@@ -523,12 +515,10 @@ def test_dof_array_arithmetic_same_as_numpy(actx_factory):
             # }}}
 
             # {{{ test DOFArrays
-
             actx_args = [
                     DOFArray(actx, (actx.from_numpy(arg),))
                     if isinstance(arg, np.ndarray) else arg
                     for arg in args]
-
             actx_result = actx.to_numpy(op_func_actx(*actx_args)[0])
 
             assert np.allclose(actx_result, ref_result)
@@ -651,7 +641,7 @@ def test_array_equal_same_as_numpy(actx_factory):
 ])
 def test_array_context_einsum_array_manipulation(actx_factory, spec):
     actx = actx_factory()
-    if type(actx) == _PyCUDAArrayContextForTests:
+    if isinstance(actx, PyCUDAArrayContext):
         pytest.skip("Waiting for loopy to be more capable")
 
     mat = actx.from_numpy(np.random.randn(10, 10))
@@ -668,7 +658,7 @@ def test_array_context_einsum_array_manipulation(actx_factory, spec):
 ])
 def test_array_context_einsum_array_matmatprods(actx_factory, spec):
     actx = actx_factory()
-    if type(actx) == _PyCUDAArrayContextForTests:
+    if isinstance(actx, PyCUDAArrayContext):
         pytest.skip("Waiting for loopy to be more capable")
         
     mat_a = actx.from_numpy(np.random.randn(5, 5))
@@ -684,7 +674,7 @@ def test_array_context_einsum_array_matmatprods(actx_factory, spec):
 ])
 def test_array_context_einsum_array_tripleprod(actx_factory, spec):
     actx = actx_factory()
-    if type(actx) == _PyCUDAArrayContextForTests:
+    if isinstance(actx, PyCUDAArrayContext):
         pytest.skip("Waiting for loopy to be more capable")
 
     mat_a = actx.from_numpy(np.random.randn(7, 5))
@@ -1323,7 +1313,6 @@ class Foo:
 def test_leaf_array_type_broadcasting(actx_factory):
     # test support for https://github.com/inducer/arraycontext/issues/49
     actx = actx_factory()
-
     foo = Foo(DOFArray(actx, (actx.zeros(3, dtype=np.float64) + 41, )))
     bar = foo + 4
     baz = foo + actx.from_numpy(4*np.ones((3, )))

@@ -34,7 +34,7 @@ import numpy as np
 
 from pytools.tag import Tag
 
-from arraycontext.context import ArrayContext
+from arraycontext.context import ArrayContext, _ScalarLike
 
 import pycuda
 import pycuda.gpuarray as gpuarray
@@ -83,14 +83,15 @@ class PyCUDAArrayContext(ArrayContext):
         return gpuarray.zeros(shape=shape, dtype=dtype,
                 allocator=self.allocator)
 
-    def from_numpy(self, array: np.ndarray):
+    def from_numpy(self, array: Union[np.ndarray, _ScalarLike]):
         import pycuda.gpuarray as gpuarray
-        return gpuarray.to_gpu(array, allocator=self.allocator)
+        if isinstance(array, np.ndarray):
+            return gpuarray.to_gpu(array, allocator=self.allocator)
+        return array
 
     def to_numpy(self, array):
-        if isinstance(array, (np.ndarray, int, float, complex)):
+        if np.isscalar(array):
             return array
-        import pycuda.gpuarray as gpuarray
         return array.get()
 
     def call_loopy(self, t_unit, **kwargs):
