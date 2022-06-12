@@ -117,12 +117,6 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
     def less_equal(self, x, y):
         return rec_multimap_array_container(operator.le, x, y)
 
-    # def logical_and(x1: gpuarray.GPUArray, x2: pycuda.tools.ScalarArg):
-    #     result = True
-    #     for i in range(len(x1)):
-    #         result = result and (x1[i] == x2)
-    # }}}
-
     def maximum(self, x, y):
         return rec_multimap_array_container(gpuarray.maximum,x, y)
 
@@ -171,16 +165,36 @@ class PyCUDAFakeNumpyNamespace(BaseFakeNumpyNamespace):
         return self._new_like(ary, _full_like)
 
     def reshape(self, a, newshape, order="C"):
-        return gpuarray.reshape(a, newshape, order=order)
+        return rec_map_array_container(
+            lambda ary : gpuarray.reshape(ary, newshape, order=order),
+            a)
 
     def concatenate(self, arrays, axis=0):
-        return  gpuarray.concatenate(
-            arrays, axis,
-            self._array_context.allocator
-        )
+        return  rec_multimap_array_container( 
+                    lambda *args: gpuarray.concatenate(arrays=args, axis=axis,
+                    allocator=self._array_context.allocator),
+                    *arrays)
 
     def ravel(self, a, order="C"):
-        return gpuarray.reshape(a,-1,order=order)
+        def _rec_ravel(a):
+            if order in "FC":
+                return gpuarray.reshape(a, -1, order=order)
+            elif order == "A":
+                if a.flags.f_contiguous:
+                    return gpuarray.reshape(a, -1, order="F")
+                elif a.flags.c_contiguous:
+                    return gpuarray.reshape(a, -1, order="C")
+                else:
+                    raise ValueError("For `order='A'`, array should be either"
+                                     " F-contiguous or C-contiguous.")
+            elif order == "K":
+                raise NotImplementedError("PyCUDAArrayContext.np.ravel not "
+                                          "implemented for 'order=K'")
+            else:
+                raise ValueError("`order` can be one of 'F', 'C', 'A' or 'K'. "
+                                 f"(got {order})")
+        return rec_map_array_container(_rec_ravel, a)
+
 
 # }}}
 

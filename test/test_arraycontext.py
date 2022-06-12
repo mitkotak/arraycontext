@@ -105,11 +105,12 @@ class _PyCUDAArrayContextForTestsFactory(
 
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
     _PyCUDAArrayContextForTestsFactory,
-    _PyOpenCLArrayContextForTestsFactory,
-    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    _PytatoPyOpenCLArrayContextForTestsFactory,
-    _PytestEagerJaxArrayContextFactory,
-    _PytestPytatoJaxArrayContextFactory,
+   
+   
+    # _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    # _PytatoPyOpenCLArrayContextForTestsFactory,
+    # _PytestEagerJaxArrayContextFactory,
+    # _PytestPytatoJaxArrayContextFactory,
     ])
 
 def _acf():
@@ -1036,7 +1037,6 @@ def test_container_norm(actx_factory, ord):
     ])
 def test_flatten_array_container(actx_factory, shapes):
     actx = actx_factory()
-
     from arraycontext import flatten, unflatten
     arys = _get_test_containers(actx, shapes=shapes)
 
