@@ -104,13 +104,11 @@ class _PyCUDAArrayContextForTestsFactory(
     actx_class = _PyCUDAArrayContextForTests
 
 pytest_generate_tests = pytest_generate_tests_for_array_contexts([
+    _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
+    _PytatoPyOpenCLArrayContextForTestsFactory,
+    _PytestEagerJaxArrayContextFactory,
+    _PytestPytatoJaxArrayContextFactory,
     _PyCUDAArrayContextForTestsFactory,
-   
-   
-    # _PyOpenCLArrayContextWithHostScalarsForTestsFactory,
-    # _PytatoPyOpenCLArrayContextForTestsFactory,
-    # _PytestEagerJaxArrayContextFactory,
-    # _PytestPytatoJaxArrayContextFactory,
     ])
 
 def _acf():
