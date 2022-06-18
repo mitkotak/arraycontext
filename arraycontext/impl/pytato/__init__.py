@@ -9,7 +9,6 @@ JIT-compile and execute the array expressions.
 
 Following :mod:`pytato`-based array context are provided:
 
-.. autoclass:: _BasePytatoArrayContext
 .. autoclass:: PytatoPyOpenCLArrayContext
 .. autoclass:: PytatoJAXArrayContext
 
