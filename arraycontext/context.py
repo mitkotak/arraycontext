@@ -80,6 +80,20 @@ The interface of an array context
 .. autoclass:: Array
 .. autoclass:: Scalar
 .. autoclass:: ArrayContext
+.. autofunction:: tag_axes
+
+Internal typing helpers (do not import)
+---------------------------------------
+
+.. currentmodule:: arraycontext.context
+
+This is only here because the documentation tool wants it.
+
+.. class:: SelfType
+
+.. class:: ArrayT
+
+    A type variable, with a lower bound of :class:`Array`.
 """
 
 
@@ -109,8 +123,8 @@ THE SOFTWARE.
 
 from abc import ABC, abstractmethod
 from typing import (
-        Any, Callable, Dict, Optional, Tuple, Union,
-        TYPE_CHECKING)
+        Any, Callable, Dict, Optional, Tuple, Union, Mapping,
+        TYPE_CHECKING, TypeVar)
 
 import numpy as np
 from pytools import memoize_method
@@ -128,6 +142,8 @@ try:
     from typing import Protocol
 except ImportError:
     from typing_extensions import Protocol                  # type: ignore[misc]
+
+SelfType = TypeVar("SelfType")
 
 
 class Array(Protocol):
@@ -148,6 +164,9 @@ class Array(Protocol):
     @property
     def dtype(self) -> "np.dtype[Any]":
         ...
+
+
+ArrayT = TypeVar("ArrayT", bound=Array)
 
 
 class Scalar(Protocol):
@@ -322,10 +341,12 @@ class ArrayContext(ABC):
     @abstractmethod
     def tag(self,
             tags: ToTagSetConvertible,
-            array: Array) -> Array:
+            array: ArrayT) -> ArrayT:
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* with the *tags* applied. *array*
         itself is not modified.
+
+        See :ref:`metadata` as well as application-specific metadata types.
 
         .. versionadded:: 2021.2
         """
@@ -333,10 +354,12 @@ class ArrayContext(ABC):
     @abstractmethod
     def tag_axis(self,
                  iaxis: int, tags: ToTagSetConvertible,
-                 array: Array) -> Array:
+                 array: ArrayT) -> ArrayT:
         """If the array type used by the array context is capable of capturing
         metadata, return a version of *array* in which axis number *iaxis* has
         the *tags* applied. *array* itself is not modified.
+
+        See :ref:`metadata` as well as application-specific metadata types.
 
         .. versionadded:: 2021.2
         """
@@ -402,7 +425,7 @@ class ArrayContext(ABC):
         return self.tag(tagged, out_ary)
 
     @abstractmethod
-    def clone(self) -> "ArrayContext":
+    def clone(self: SelfType) -> SelfType:
         """If possible, return a version of *self* that is semantically
         equivalent (i.e. implements all array operations in the same way)
         but is a separate object. May return *self* if that is not possible.
@@ -463,6 +486,25 @@ class ArrayContext(ABC):
         """
         *True* if the arrays support :mod:`numpy`'s advanced indexing semantics.
         """
+
+# }}}
+
+
+# {{{ tagging helpers
+
+def tag_axes(
+        actx: ArrayContext,
+        dim_to_tags: Mapping[int, ToTagSetConvertible],
+        ary: ArrayT) -> ArrayT:
+    """
+    Return a copy of *ary* with the axes in *dim_to_tags* tagged with their
+    corresponding tags. Equivalent to repeated application of
+    :meth:`ArrayContext.tag_axis`.
+    """
+    for iaxis, tags in dim_to_tags.items():
+        ary = actx.tag_axis(iaxis, tags, ary)
+
+    return ary
 
 # }}}
 

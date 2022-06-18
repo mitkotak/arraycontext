@@ -29,7 +29,7 @@ THE SOFTWARE.
 """
 
 import sys
-from .context import ArrayContext, Array, Scalar
+from .context import ArrayContext, Array, Scalar, tag_axes
 
 from .transform_metadata import (CommonSubexpressionTag,
         ElementwiseMapKernelTag)
@@ -61,7 +61,7 @@ from .container.traversal import (
         thaw, freeze,
         flatten, unflatten, flat_size_and_dtype,
         from_numpy, to_numpy,
-        outer)
+        outer, with_array_context)
 
 from .impl.pyopencl import PyOpenCLArrayContext
 from .impl.pytato import (PytatoPyOpenCLArrayContext,
@@ -78,7 +78,7 @@ from .loopy import make_loopy_program
 
 
 __all__ = (
-        "ArrayContext", "Scalar", "Array",
+        "ArrayContext", "Scalar", "Array", "tag_axes",
 
         "CommonSubexpressionTag",
         "ElementwiseMapKernelTag",
@@ -101,7 +101,7 @@ __all__ = (
         "rec_map_reduce_array_container", "rec_multimap_reduce_array_container",
         "thaw", "freeze",
         "flatten", "unflatten", "flat_size_and_dtype",
-        "from_numpy", "to_numpy",
+        "from_numpy", "to_numpy", "with_array_context",
         "outer",
 
         "PyOpenCLArrayContext", "PytatoPyOpenCLArrayContext",
