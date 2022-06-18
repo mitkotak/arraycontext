@@ -31,13 +31,11 @@ from pytools.obj_array import make_obj_array
 from arraycontext import (
         ArrayContext,
         dataclass_array_container, with_container_arithmetic,
-        serialize_container, deserialize_container,
-        freeze, thaw,
+        serialize_container, deserialize_container, with_array_context,
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
         PyCUDAArrayContext,
-
         ArrayContainer,
         to_numpy)
 from arraycontext import (  # noqa: F401
@@ -67,15 +65,6 @@ class _PyOpenCLArrayContextForTests(PyOpenCLArrayContext):
 
 class _PytatoPyOpenCLArrayContextForTests(PytatoPyOpenCLArrayContext):
     """Like :class:`PytatoPyOpenCLArrayContext`, but applies no program
-    transformations whatsoever. Only to be used for testing internal to
-    :mod:`arraycontext`.
-    """
-
-    def transform_loopy_program(self, t_unit):
-        return t_unit
-
-class _PyCUDAArrayContextForTests(PyCUDAArrayContext):
-    """Like :class:`PyCUDAArrayContext`, but applies no program
     transformations whatsoever. Only to be used for testing internal to
     :mod:`arraycontext`.
     """
@@ -203,22 +192,9 @@ def _deserialize_dof_container(
                 for i, (stream_i, v) in enumerate(iterable)))
 
 
-@freeze.register(DOFArray)
-def _freeze_dofarray(ary, actx=None):
-    assert actx is None
-    return type(ary)(
-        None,
-        tuple(ary.array_context.freeze(subary) for subary in ary.data))
-
-
-@thaw.register(DOFArray)
-def _thaw_dofarray(ary, actx):
-    if ary.array_context is not None:
-        raise ValueError("cannot thaw DOFArray that already has an array context")
-
-    return type(ary)(
-        actx,
-        tuple(actx.thaw(subary) for subary in ary.data))
+@with_array_context.register(DOFArray)
+def _with_actx_dofarray(ary, actx):
+    return type(ary)(actx, ary.data)
 
 # }}}
 
@@ -987,22 +963,22 @@ def test_container_freeze_thaw(actx_factory):
     assert get_container_context_recursively_opt(mat_of_dofs) is actx
 
     for ary in [ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs]:
-        frozen_ary = freeze(ary)
-        thawed_ary = thaw(frozen_ary, actx)
-        frozen_ary = freeze(thawed_ary)
+        frozen_ary = actx.freeze(ary)
+        thawed_ary = actx.thaw(frozen_ary)
+        frozen_ary = actx.freeze(thawed_ary)
 
         assert get_container_context_recursively_opt(frozen_ary) is None
         assert get_container_context_recursively_opt(thawed_ary) is actx
 
     actx2 = actx.clone()
 
-    ary_dof_frozen = freeze(ary_dof)
+    ary_dof_frozen = actx.freeze(ary_dof)
     with pytest.raises(ValueError) as exc_info:
         ary_dof + ary_dof_frozen
 
     assert "frozen" in str(exc_info.value)
 
-    ary_dof_2 = thaw(freeze(ary_dof), actx2)
+    ary_dof_2 = actx2.thaw(actx.freeze(ary_dof))
 
     with pytest.raises(ValueError):
         ary_dof + ary_dof_2
@@ -1211,6 +1187,11 @@ class Velocity2D:
     u: ArrayContainer
     v: ArrayContainer
     array_context: ArrayContext
+
+
+@with_array_context.register(Velocity2D)
+def _with_actx_velocity_2d(ary, actx):
+    return type(ary)(ary.u, ary.v, actx)
 
 
 def scale_and_orthogonalize(alpha, vel):
@@ -1459,14 +1440,16 @@ def test_actx_compile_on_pure_array_return(actx_factory):
         return 2 * x
 
     actx = actx_factory()
-    ones = actx.zeros(shape=(10, 4), dtype=np.float64) + 1
+    ones = actx.thaw(actx.freeze(
+        actx.zeros(shape=(10, 4), dtype=np.float64) + 1
+        ))
     np.testing.assert_allclose(actx.to_numpy(_twice(ones)),
                                actx.to_numpy(actx.compile(_twice)(ones)))
 
 # }}}
 
 
-# {{{
+# {{{ test_taggable_cl_array_tags
 
 def test_taggable_cl_array_tags(actx_factory):
     actx = actx_factory()
@@ -1519,6 +1502,27 @@ def test_to_numpy_on_frozen_arrays(actx_factory):
     u = actx.freeze(actx.zeros(10, dtype="float64")+1)
     np.testing.assert_allclose(actx.to_numpy(u), 1)
     np.testing.assert_allclose(to_numpy(u, actx), 1)
+
+
+def test_tagging(actx_factory):
+    actx = actx_factory()
+
+    if isinstance(actx, EagerJAXArrayContext):
+        pytest.skip("Eager JAX has no tagging support")
+
+    from pytools.tag import Tag
+
+    class ExampleTag(Tag):
+        pass
+
+    ary = tag_axes(actx, {0: ExampleTag()},
+            actx.tag(
+                ExampleTag(),
+                actx.zeros((20, 20), dtype=np.float64)))
+
+    assert ary.tags_of_type(ExampleTag)
+    assert ary.axes[0].tags_of_type(ExampleTag)
+    assert not ary.axes[1].tags_of_type(ExampleTag)
 
 
 if __name__ == "__main__":

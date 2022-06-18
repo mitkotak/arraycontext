@@ -3,7 +3,6 @@
 
 .. autoclass:: PytestArrayContextFactory
 .. autoclass:: PytestPyOpenCLArrayContextFactory
-.. autoclass:: PytestPyCUDAArrayContextFactory
 
 .. autofunction:: pytest_generate_tests_for_array_contexts
 .. autofunction:: pytest_generate_tests_for_pyopencl_array_context
@@ -36,7 +35,6 @@ THE SOFTWARE.
 from typing import Any, Callable, Dict, Sequence, Type, Union
 
 import pyopencl as cl
-import pycuda
 from arraycontext.context import ArrayContext
 
 
@@ -72,22 +70,6 @@ class PytestPyOpenCLArrayContextFactory(PytestArrayContextFactory):
         # the context survives.
         ctx = cl.Context([self.device])
         return ctx, cl.CommandQueue(ctx)
-
-    def __call__(self) -> ArrayContext:
-        raise NotImplementedError
-
-
-class PytestPyCUDAArrayContextFactory:
-    """
-    .. automethod:: __init__
-    .. automethod:: __call__
-    """
-
-    def __init__(self, allocator):
-        """
-        :arg allocator: a :class:`gpuarray.allocator`.
-        """
-        self.allocator = allocator
 
     def __call__(self) -> ArrayContext:
         raise NotImplementedError
