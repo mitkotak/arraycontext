@@ -494,10 +494,12 @@ def test_dof_array_arithmetic_same_as_numpy(actx_factory):
             # }}}
 
             # {{{ test DOFArrays
+
             actx_args = [
                     DOFArray(actx, (actx.from_numpy(arg),))
                     if isinstance(arg, np.ndarray) else arg
                     for arg in args]
+
             actx_result = actx.to_numpy(op_func_actx(*actx_args)[0])
 
             assert np.allclose(actx_result, ref_result)
@@ -1011,6 +1013,7 @@ def test_container_norm(actx_factory, ord):
     ])
 def test_flatten_array_container(actx_factory, shapes):
     actx = actx_factory()
+
     from arraycontext import flatten, unflatten
     arys = _get_test_containers(actx, shapes=shapes)
 
@@ -1299,6 +1302,7 @@ class Foo:
 def test_leaf_array_type_broadcasting(actx_factory):
     # test support for https://github.com/inducer/arraycontext/issues/49
     actx = actx_factory()
+
     foo = Foo(DOFArray(actx, (actx.zeros(3, dtype=np.float64) + 41, )))
     bar = foo + 4
     baz = foo + actx.from_numpy(4*np.ones((3, )))
