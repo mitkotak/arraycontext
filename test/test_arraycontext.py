@@ -35,9 +35,10 @@ from arraycontext import (
         FirstAxisIsElementsTag,
         PyOpenCLArrayContext,
         PytatoPyOpenCLArrayContext,
+        EagerJAXArrayContext,
         PyCUDAArrayContext,
         ArrayContainer,
-        to_numpy)
+        to_numpy, tag_axes)
 from arraycontext import (  # noqa: F401
         pytest_generate_tests_for_array_contexts,
         )
@@ -955,6 +956,8 @@ def test_container_arithmetic(actx_factory):
 
 def test_container_freeze_thaw(actx_factory):
     actx = actx_factory()
+    if isinstance(actx, PyCUDAArrayContext):
+        pytest.skip(f"not relevant for '{type(actx).__name__}'")
     ary_dof, ary_of_dofs, mat_of_dofs, dc_of_dofs, bcast_dc_of_dofs = \
             _get_test_containers(actx)
 
@@ -1518,6 +1521,8 @@ def test_to_numpy_on_frozen_arrays(actx_factory):
 
 def test_tagging(actx_factory):
     actx = actx_factory()
+    if isinstance(actx, PyCUDAArrayContext):
+        pytest.skip("PyCUDA has no tagging support")
 
     if isinstance(actx, EagerJAXArrayContext):
         pytest.skip("Eager JAX has no tagging support")
