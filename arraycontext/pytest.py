@@ -3,6 +3,7 @@
 
 .. autoclass:: PytestArrayContextFactory
 .. autoclass:: PytestPyOpenCLArrayContextFactory
+.. autoclass:: PytestPyCUDAArrayContextFactory
 
 .. autofunction:: pytest_generate_tests_for_array_contexts
 .. autofunction:: pytest_generate_tests_for_pyopencl_array_context
@@ -132,6 +133,20 @@ class _PytestPytatoPyOpenCLArrayContextFactory(
                     self.device.name.strip(),
                     self.device.platform.name.strip()))
 
+class PytestPyCUDAArrayContextFactory:
+     """
+     .. automethod:: __init__
+     .. automethod:: __call__
+     """
+
+     def __init__(self, allocator):
+         """
+         :arg allocator: a :class:`gpuarray.allocator`.
+         """
+         self.allocator = allocator
+
+     def __call__(self) -> ArrayContext:
+         raise NotImplementedError
 
 class _PytestPyCUDAArrayContextFactory(
         PytestPyCUDAArrayContextFactory):

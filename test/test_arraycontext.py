@@ -72,6 +72,14 @@ class _PytatoPyOpenCLArrayContextForTests(PytatoPyOpenCLArrayContext):
     def transform_loopy_program(self, t_unit):
         return t_unit
 
+class _PyCUDAArrayContextForTests(PyCUDAArrayContext):
+    """Like :class:`PyCUDArrayContext`, but applies no program
+    transformations whatsoever. Only to be used for testing internal to
+    :mod:`arraycontext`.
+    """
+
+    def transform_loopy_program(self, t_unit):
+        return t_unit
 
 class _PyOpenCLArrayContextWithHostScalarsForTestsFactory(
         _PytestPyOpenCLArrayContextFactoryWithClass):
